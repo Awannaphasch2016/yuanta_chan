@@ -13,7 +13,7 @@ from datetime import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lambda_functions', 'ticket_creation'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'common'))
 
-from lambda_function import TicketCreationService, lambda_handler
+from lambda_functions.ticket_creation.lambda_function import TicketCreationService, lambda_handler
 
 class TestTicketCreationService(unittest.TestCase):
     """Test cases for TicketCreationService class."""
