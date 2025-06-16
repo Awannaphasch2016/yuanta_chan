@@ -1,0 +1,6 @@
+{
+  "role_arn": "arn:aws:iam::864130225056:role/yuanta-prod-BedrockAgentRole",
+  "status": "failed",
+  "error": "An error occurred (ValidationException) when calling the CreateAgentActionGroup operation: Create operation can't be performed on ActionGroup when Agent is in Creating state. Retry the request when the agent is in a valid state.",
+  "last_updated": "2025-06-16T13:18:36.399333"
+}

@@ -16,6 +16,9 @@ awslabs-aws-documentation-mcp-server = "^1.0.2"
 awslabs-lambda-tool-mcp-server = "^2.0.2"
 awslabs-cloudwatch-logs-mcp-server = "^0.0.2"
 awslabs-aws-serverless-mcp-server = "^0.1.4"
+python-dotenv = "^1.1.0"
+awslabs-cdk-mcp-server = "^1.0.2"
+boto3 = "^1.38.36"
 
 
 [tool.poetry.group.dev.dependencies]

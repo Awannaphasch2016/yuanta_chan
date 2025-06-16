@@ -74,3 +74,6 @@ pids
 #claude.code specific
 .claude/
 CLAUDE.md
+
+# Environment variables
+.env

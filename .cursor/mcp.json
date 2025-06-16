@@ -49,6 +49,16 @@
         "--allow-write"
       ],
       "transportType": "stdio"
+    },
+    "awslabs.cdk-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.cdk-mcp-server@latest",
+        "awslabs.cdk-mcp-server.exe",
+        "--allow-write"
+      ],
+      "transportType": "stdio"
     }
   }
 }
