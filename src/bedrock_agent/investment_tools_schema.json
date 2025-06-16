@@ -1,0 +1,108 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Investment Analysis Tools",
+    "version": "1.0.0",
+    "description": "API for investment analysis and financial data retrieval"
+  },
+  "paths": {
+    "/analyze_investment": {
+      "post": {
+        "summary": "Analyze investment for a given stock ticker",
+        "description": "Performs comprehensive investment analysis including financial metrics, recommendations, and insights",
+        "operationId": "analyze_investment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ticker": {
+                    "type": "string",
+                    "description": "Stock ticker symbol (e.g., AAPL, MSFT, GOOGL)",
+                    "example": "AAPL"
+                  },
+                  "depth": {
+                    "type": "string",
+                    "description": "Analysis depth level",
+                    "enum": ["quick", "standard", "detailed"],
+                    "default": "standard"
+                  }
+                },
+                "required": ["ticker"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Investment analysis completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "analysis": {
+                      "type": "string",
+                      "description": "Formatted investment analysis with recommendations"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_financial_data": {
+      "post": {
+        "summary": "Get financial data for a stock ticker",
+        "description": "Retrieves basic financial data and metrics for a company",
+        "operationId": "get_financial_data",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ticker": {
+                    "type": "string",
+                    "description": "Stock ticker symbol",
+                    "example": "AAPL"
+                  },
+                  "data_type": {
+                    "type": "string",
+                    "description": "Type of financial data to retrieve",
+                    "enum": ["overview", "metrics", "earnings"],
+                    "default": "overview"
+                  }
+                },
+                "required": ["ticker"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Financial data retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string",
+                      "description": "Formatted financial data"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} 

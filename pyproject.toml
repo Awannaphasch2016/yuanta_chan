@@ -10,6 +10,12 @@ packages = [{include = "iac", from = "src"}]
 python = "^3.12"
 yfinance = "^0.2.63"
 chardet = "^5.2.0"
+uv = "^0.7.13"
+awslabs-core-mcp-server = "^1.0.1"
+awslabs-aws-documentation-mcp-server = "^1.0.2"
+awslabs-lambda-tool-mcp-server = "^2.0.2"
+awslabs-cloudwatch-logs-mcp-server = "^0.0.2"
+awslabs-aws-serverless-mcp-server = "^0.1.4"
 
 
 [tool.poetry.group.dev.dependencies]

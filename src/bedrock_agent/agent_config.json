@@ -1,0 +1,30 @@
+{
+  "agentName": "InvestmentAnalysisAgent",
+  "description": "Professional investment analysis assistant for financial data and insights",
+  "foundationModel": "anthropic.claude-3-sonnet-20240229-v1:0",
+  "instruction": "You are a professional investment analysis assistant for a brokerage company. You help investment consultants and clients analyze financial data, understand company performance, and make informed investment decisions. Always provide accurate, well-structured responses with appropriate financial disclaimers. Use the available tools to fetch real-time financial data and generate comprehensive analysis. When users ask questions like 'How does Apple make money?', use the analyze_investment tool to get detailed financial analysis and present it in a clear, professional manner.",
+  "idleSessionTTLInSeconds": 1800,
+  "agentResourceRoleArn": "arn:aws:iam::ACCOUNT_ID:role/BedrockAgentRole",
+  "actionGroups": [
+    {
+      "actionGroupName": "InvestmentTools",
+      "description": "Tools for investment analysis and financial data retrieval",
+      "actionGroupExecutor": {
+        "lambda": "arn:aws:lambda:REGION:ACCOUNT_ID:function:BedrockAgentAdapter"
+      },
+      "apiSchema": {
+        "payload": "investment_tools_schema.json"
+      }
+    }
+  ],
+  "promptOverrideConfiguration": {
+    "promptConfigurations": [
+      {
+        "promptType": "PRE_PROCESSING",
+        "promptCreationMode": "OVERRIDDEN",
+        "promptState": "ENABLED",
+        "basePromptTemplate": "You are a professional investment analysis assistant. When users ask about companies or investments, use the available tools to provide accurate, data-driven analysis."
+      }
+    ]
+  }
+} 

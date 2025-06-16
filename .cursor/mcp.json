@@ -1,0 +1,54 @@
+{
+  "mcpServers": {
+    "awslabs.core-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.core-mcp-server@latest",
+        "awslabs.core-mcp-server.exe",
+        "--allow-write"
+      ],
+      "transportType": "stdio"
+    },
+    "awslabs.aws-documentation-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.aws-documentation-mcp-server@latest",
+        "awslabs.aws-documentation-mcp-server.exe",
+        "--allow-write"
+      ],
+      "transportType": "stdio"
+    },
+    "awslabs.lambda-tool-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.lambda-tool-mcp-server@latest",
+        "awslabs.lambda-tool-mcp-server.exe",
+        "--allow-write"
+      ],
+      "transportType": "stdio"
+    },
+    "awslabs.cloudwatch-logs-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.cloudwatch-logs-mcp-server@latest",
+        "awslabs.cloudwatch-logs-mcp-server.exe",
+        "--allow-write"
+      ],
+      "transportType": "stdio"
+    },
+    "awslabs.aws-serverless-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.aws-serverless-mcp-server@latest",
+        "awslabs.aws-serverless-mcp-server.exe",
+        "--allow-write"
+      ],
+      "transportType": "stdio"
+    }
+  }
+}

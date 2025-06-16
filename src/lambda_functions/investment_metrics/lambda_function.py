@@ -636,6 +636,38 @@ if __name__ == "__main__":
         {"ticker": "GOOGL", "depth": "quick", "requestId": "board-demo-003"}
     ]
     
+    print("AWS Chatbot Investment Analysis - Board Demonstration")
+    print("=" * 60)
+    
+    for i, test_event in enumerate(test_cases, 1):
+        print(f"Test Case {i}: {test_event['ticker']} ({test_event['depth']} analysis)")
+        print("-" * 40)
+        
+        result = lambda_handler(test_event, None)
+        
+        if result['statusCode'] == 200:
+            data = json.loads(result['body'])
+            if data['success']:
+                analysis = data['analysis']
+                perf = data['performance']
+                
+                print(f"Success: {analysis['recommendation']['recommendation']}")
+                print(f"Execution Time: {perf['total_execution_time']}s")
+            else:
+                print(f"Failed: {data['error']}")
+        else:
+            print(f"HTTP Error: {result['statusCode']}")
+    
+    print("=" * 60)
+    print("Board Demonstration Complete - AWS Chatbot Ready!")
+if __name__ == "__main__":
+    # Test cases for board demonstration
+    test_cases = [
+        {"ticker": "AAPL", "depth": "detailed", "requestId": "board-demo-001"},
+        {"ticker": "MSFT", "depth": "standard", "requestId": "board-demo-002"},
+        {"ticker": "GOOGL", "depth": "quick", "requestId": "board-demo-003"}
+    ]
+    
     print("🎯 AWS Chatbot Investment Analysis - Board Demonstration")
     print("=" * 60)
     
