@@ -19,6 +19,8 @@ awslabs-aws-serverless-mcp-server = "^0.1.4"
 python-dotenv = "^1.1.0"
 awslabs-cdk-mcp-server = "^1.0.2"
 boto3 = "^1.38.36"
+aws-cdk-lib = "^2.201.0"
+constructs = "^10.4.2"
 
 
 [tool.poetry.group.dev.dependencies]

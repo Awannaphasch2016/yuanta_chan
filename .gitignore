@@ -77,3 +77,6 @@ CLAUDE.md
 
 # Environment variables
 .env
+
+# deployment state
+.deployment_state_prod.json
