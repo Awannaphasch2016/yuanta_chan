@@ -7,7 +7,6 @@ Since CDK deployment requires CLI tools, follow these steps:
    npm install -g aws-cdk
 
 2️⃣ Set AWS Credentials:
-   # Set your AWS credentials as environment variables (do NOT hardcode in code or documentation)
    $env:AWS_ACCESS_KEY_ID="<YOUR_AWS_ACCESS_KEY_ID>"
    $env:AWS_SECRET_ACCESS_KEY="<YOUR_AWS_SECRET_ACCESS_KEY>"
    $env:AWS_REGION="<YOUR_AWS_REGION>"

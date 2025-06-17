@@ -15,11 +15,8 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Add parent directories to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-
-from lambda_functions.investment_metrics.lambda_function import SequentialInvestmentAnalyzer
-from common.logger import get_logger
+from investment_analyzer import SequentialInvestmentAnalyzer
+from logger import get_logger
 
 class BedrockAgentAdapter:
     """Hybrid adapter integrating Lambda functions with real Bedrock LLM"""

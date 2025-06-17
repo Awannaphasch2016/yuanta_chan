@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import json
 import time
 
-from .logger import get_logger
+from logger import get_logger
 
 
 class YahooFinanceClient:

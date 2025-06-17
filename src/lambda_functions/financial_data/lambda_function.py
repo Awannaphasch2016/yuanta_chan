@@ -10,11 +10,8 @@ import os
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-# Add parent directories to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-from common.logger import get_logger
-from common.yahoo_finance_client import yahoo_client
+from logger import get_logger
+from yahoo_finance_client import yahoo_client
 
 
 class FinancialDataService:

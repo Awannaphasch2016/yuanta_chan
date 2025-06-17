@@ -59,6 +59,38 @@
         "--allow-write"
       ],
       "transportType": "stdio"
+    },  
+    "awslabs.cloudformation-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs.cfn-mcp-server@latest",
+        "awslabs.cfn-mcp-server.exe"
+      ],
+      "transportType": "stdio"
+    },
+    "aws-cli-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "aws-cli-mcp-server@latest",
+        "aws-cli-mcp-server.exe"
+      ],
+      "transportType": "stdio"
+    },
+    "docker-mcp-toolkit": {
+      "command": "uvx",
+      "args": [
+        "docker-mcp"
+      ],
+      "transportType": "stdio"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\Vivobook\\Documents\\yuanta_chan"
+      ],
+      "transportType": "stdio"
     }
   }
 }

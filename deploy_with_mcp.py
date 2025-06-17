@@ -11,6 +11,9 @@ import subprocess
 import time
 from typing import Dict, Any, List
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class MCPCDKDeployment:
     """CDK deployment using awslabs MCP servers"""
@@ -186,7 +189,6 @@ Since CDK deployment requires CLI tools, follow these steps:
    npm install -g aws-cdk
 
 2️⃣ Set AWS Credentials:
-   # Set your AWS credentials as environment variables (do NOT hardcode in code or documentation)
    $env:AWS_ACCESS_KEY_ID="<YOUR_AWS_ACCESS_KEY_ID>"
    $env:AWS_SECRET_ACCESS_KEY="<YOUR_AWS_SECRET_ACCESS_KEY>"
    $env:AWS_REGION="<YOUR_AWS_REGION>"
@@ -218,7 +220,7 @@ Since CDK deployment requires CLI tools, follow these steps:
    • Set up monitoring and alerts
         """
         
-        # Save guide to file (ensure UTF-8 encoding for emojis)
+        # Save guide to file
         guide_file = self.project_root / "DEPLOYMENT_GUIDE.md"
         with open(guide_file, 'w', encoding='utf-8') as f:
             f.write(guide)
@@ -246,17 +248,19 @@ Since CDK deployment requires CLI tools, follow these steps:
 
 def main():
     """Main deployment function"""
-    # Remove hardcoded AWS credentials. Only use environment variables.
+    # Set AWS environment variables if not already set
     if not os.getenv('AWS_ACCESS_KEY_ID'):
-        print("❌ AWS_ACCESS_KEY_ID environment variable not set. Please set it before running this script.")
+        print("❌ AWS_ACCESS_KEY_ID is not set")
         sys.exit(1)
     if not os.getenv('AWS_SECRET_ACCESS_KEY'):
-        print("❌ AWS_SECRET_ACCESS_KEY environment variable not set. Please set it before running this script.")
+        print("❌ AWS_SECRET_ACCESS_KEY is not set")
         sys.exit(1)
     if not os.getenv('AWS_REGION'):
-        os.environ['AWS_REGION'] = "ap-southeast-1"
+        print("❌ AWS_REGION is not set")
+        sys.exit(1)
     if not os.getenv('AWS_ACCOUNT_ID'):
-        os.environ['AWS_ACCOUNT_ID'] = "864130225056"
+        print("❌ AWS_ACCOUNT_ID is not set")
+        sys.exit(1)
     
     # Execute deployment preparation
     deployer = MCPCDKDeployment()

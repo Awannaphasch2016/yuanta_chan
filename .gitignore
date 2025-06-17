@@ -80,3 +80,47 @@ CLAUDE.md
 
 # deployment state
 .deployment_state_prod.json
+response.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Poetry
+poetry.lock
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+
+# AWS CDK output
+cdk.out/
+*.template.json
+
+# Lambda build artifacts
+src/lambda_functions/*/requirements.txt
+src/bedrock_agent/requirements.txt
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.swp
+
+# Logs and reports
+*.log
+*.report
+aws_cdk_validation_report.json
+FLAT_PACKAGING_SUMMARY.md
+DEPENDENCY_FIX_SUMMARY.md
+
+# MCP/AI/agent files
+.cursor/
+

@@ -23,7 +23,7 @@ class ChatbotInfrastructureStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # Configuration from environment
-        self.account_id = os.getenv('AWS_ACCOUNT_ID', '864130225056')
+        self.account_id = os.getenv('AWS_ACCOUNT_ID')
         
         # Create IAM roles first
         self.lambda_execution_role = self._create_lambda_execution_role()
@@ -101,7 +101,16 @@ class ChatbotInfrastructureStack(Stack):
             self, "InvestmentMetricsFunction",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="lambda_function.lambda_handler",
-            code=_lambda.Code.from_asset("src/lambda_functions/investment_metrics"),
+            code=_lambda.Code.from_asset(
+                "src/lambda_functions/investment_metrics",
+                bundling=cdk.BundlingOptions(
+                    image=_lambda.Runtime.PYTHON_3_12.bundling_image,
+                    command=[
+                        "bash", "-c",
+                        "pip install -r requirements.txt -t /asset-output && cp -r . /asset-output"
+                    ]
+                )
+            ),
             role=self.lambda_execution_role,
             timeout=Duration.seconds(30),
             memory_size=512,
@@ -118,7 +127,16 @@ class ChatbotInfrastructureStack(Stack):
             self, "FinancialDataFunction", 
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="lambda_function.lambda_handler",
-            code=_lambda.Code.from_asset("src/lambda_functions/financial_data"),
+            code=_lambda.Code.from_asset(
+                "src/lambda_functions/financial_data",
+                bundling=cdk.BundlingOptions(
+                    image=_lambda.Runtime.PYTHON_3_12.bundling_image,
+                    command=[
+                        "bash", "-c",
+                        "pip install -r requirements.txt -t /asset-output && cp -r . /asset-output"
+                    ]
+                )
+            ),
             role=self.lambda_execution_role,
             timeout=Duration.seconds(30),
             memory_size=512,
@@ -135,7 +153,16 @@ class ChatbotInfrastructureStack(Stack):
             self, "TicketCreationFunction",
             runtime=_lambda.Runtime.PYTHON_3_12, 
             handler="lambda_function.lambda_handler",
-            code=_lambda.Code.from_asset("src/lambda_functions/ticket_creation"),
+            code=_lambda.Code.from_asset(
+                "src/lambda_functions/ticket_creation",
+                bundling=cdk.BundlingOptions(
+                    image=_lambda.Runtime.PYTHON_3_12.bundling_image,
+                    command=[
+                        "bash", "-c",
+                        "pip install -r requirements.txt -t /asset-output && cp -r . /asset-output"
+                    ]
+                )
+            ),
             role=self.lambda_execution_role,
             timeout=Duration.seconds(30),
             memory_size=512,
@@ -152,7 +179,16 @@ class ChatbotInfrastructureStack(Stack):
             self, "BedrockAdapterFunction",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="bedrock_adapter.lambda_handler", 
-            code=_lambda.Code.from_asset("src/bedrock_agent"),
+            code=_lambda.Code.from_asset(
+                "src/bedrock_agent",
+                bundling=cdk.BundlingOptions(
+                    image=_lambda.Runtime.PYTHON_3_12.bundling_image,
+                    command=[
+                        "bash", "-c",
+                        "pip install -r requirements.txt -t /asset-output && cp -r . /asset-output"
+                    ]
+                )
+            ),
             role=self.lambda_execution_role,
             timeout=Duration.seconds(60),
             memory_size=1024,
@@ -226,8 +262,8 @@ class ChatbotApp(cdk.App):
         ChatbotInfrastructureStack(
             self, "ChatbotInfrastructureStack",
             env=cdk.Environment(
-                account=os.getenv('AWS_ACCOUNT_ID', '864130225056'),
-                region=os.getenv('AWS_REGION', 'ap-southeast-1')
+                account=os.getenv('AWS_ACCOUNT_ID'),
+                region=os.getenv('AWS_REGION')
             ),
             description="InHouse AI Chatbot Infrastructure with Bedrock Agent and Lambda Tools"
         )
