@@ -190,9 +190,37 @@ class ResponseGenerator:
 **Dependencies**: Phase 1 foundation completed successfully ✅
 **Estimated Duration**: Week 2 of implementation roadmap
 
+## BUILD Mode: InvestmentMetricsFunction Deployment - **IN PROGRESS**
+**Date**: 2025-06-16
+**Build Type**: Level 2 Simple Enhancement - Single Lambda Deployment
+
+### ✅ **Build Components Created:**
+- **`cdk/single_lambda_app.py`**: Minimal CDK app for InvestmentMetricsFunction only (104 lines) ✅
+- **`deploy_investment_metrics.py`**: Automated deployment script with pre-checks (168 lines) ✅
+
+### 🚀 **Deployment Execution:**
+**Status**: **ACTIVELY DEPLOYING** - `python deploy_investment_metrics.py` (Fixed with Poetry integration)
+**Approach**: Automated deployment with comprehensive validation and dependency resolution
+**Target Function**: `ChatbotInvestmentMetrics`
+**Account**: 864130225056 (ap-southeast-1)
+
+### 📋 **Deployment Components:**
+- **Pre-deployment Checks**: AWS credentials, CDK installation, file dependencies ✅
+- **CDK Bootstrap**: Automated CDK environment setup
+- **Single Lambda Deploy**: Focused deployment of InvestmentMetricsFunction only
+- **Post-deployment Test**: Optional Lambda function validation
+
+### ⚙️ **Build Specifications:**
+- **Runtime**: Python 3.12
+- **Handler**: `lambda_function.lambda_handler`
+- **Memory**: 512 MB, Timeout: 30 seconds
+- **Dependencies**: yfinance>=0.2.37, requests, pandas, numpy
+- **IAM Role**: Lambda basic execution with CloudWatch logging
+- **Log Group**: `/aws/lambda/ChatbotInvestmentMetrics` (1 week retention)
+
 ## Ready State
-✅ **Status**: BUILD Mode Phase 1 **ACTUALLY COMPLETE** - Ready for Phase 2
-✅ **Action**: Continue with Phase 2 Lambda Tools Development implementation
+✅ **Status**: BUILD Mode **ACTIVE** - InvestmentMetricsFunction deployment in progress
+✅ **Action**: Single Lambda deployment executing via automated script
 ✅ **Foundation**: All core infrastructure and utilities in place and tested
 ✅ **Test Coverage**: 100% passing (11/11 tests across all Lambda functions)
 

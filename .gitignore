@@ -98,7 +98,7 @@ env/
 venv/
 
 # AWS CDK output
-cdk.out/
+cdk/*/cdk.out/
 *.template.json
 
 # Lambda build artifacts
