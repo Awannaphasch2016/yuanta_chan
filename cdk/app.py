@@ -85,10 +85,7 @@ class ChatbotInfrastructureStack(Stack):
                                 "bedrock:InvokeModel",
                                 "lambda:InvokeFunction"
                             ],
-                            resources=[
-                                f"arn:aws:bedrock:{self.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0",
-                                f"arn:aws:lambda:{self.region}:{self.account_id}:function:*"
-                            ]
+                            resources=["*"]
                         )
                     ]
                 )
@@ -102,7 +99,7 @@ class ChatbotInfrastructureStack(Stack):
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="lambda_function.lambda_handler",
             code=_lambda.Code.from_asset(
-                "src/lambda_functions/investment_metrics",
+                "../src/lambda_functions/investment_metrics",
                 bundling=cdk.BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_12.bundling_image,
                     command=[
@@ -128,7 +125,7 @@ class ChatbotInfrastructureStack(Stack):
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="lambda_function.lambda_handler",
             code=_lambda.Code.from_asset(
-                "src/lambda_functions/financial_data",
+                "../src/lambda_functions/financial_data",
                 bundling=cdk.BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_12.bundling_image,
                     command=[
@@ -154,7 +151,7 @@ class ChatbotInfrastructureStack(Stack):
             runtime=_lambda.Runtime.PYTHON_3_12, 
             handler="lambda_function.lambda_handler",
             code=_lambda.Code.from_asset(
-                "src/lambda_functions/ticket_creation",
+                "../src/lambda_functions/ticket_creation",
                 bundling=cdk.BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_12.bundling_image,
                     command=[
@@ -180,7 +177,7 @@ class ChatbotInfrastructureStack(Stack):
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="bedrock_adapter.lambda_handler", 
             code=_lambda.Code.from_asset(
-                "src/bedrock_agent",
+                "../src/bedrock_agent",
                 bundling=cdk.BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_12.bundling_image,
                     command=[
