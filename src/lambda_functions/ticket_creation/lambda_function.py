@@ -8,6 +8,7 @@ import json
 import sys
 import os
 import uuid
+import time
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -301,106 +302,247 @@ class TicketCreationService:
 def lambda_handler(event, context):
     """
     AWS Lambda handler for ticket creation and management requests
+    Optimized for Amazon Bedrock Agent integration
     
-    Expected event format:
+    Expected event format from Bedrock Agent:
     {
-        "action": "create|status|update|list",
-        "ticket_id": "TIK-xxx" (for status/update actions),
-        "ticket_data": {...} (for create action),
-        "updates": {...} (for update action),
-        "filters": {...} (for list action)
+        "messageVersion": "1.0",
+        "actionGroup": "TicketManagementActionGroup",
+        "function": "manageTickets",
+        "parameters": [
+            {"name": "action", "value": "create|status|update|list"},
+            {"name": "title", "value": "..."},
+            {"name": "description", "value": "..."},
+            ...
+        ]
     }
     """
     logger = get_logger("TicketCreationHandler")
+    print(f"DEBUG: Full event received by Lambda: {json.dumps(event, indent=2)}")
+    
+    # Extract required values for Bedrock Agent response structure
+    actionGroup = event.get('actionGroup', 'TicketManagementActionGroup')
+    function = event.get('function', 'manageTickets')
+    messageVersion = event.get('messageVersion', '1.0')
     
     try:
         logger.info("Ticket Creation Lambda function invoked", context={"event": event})
         
-        # Extract action from event
-        action = event.get('action')
+        # Extract parameters following Bedrock Agent format
+        action = ''
+        ticket_id = ''
+        title = ''
+        description = ''
+        category = ''
+        requester = ''
+        priority = 'medium'
+        assigned_to = ''
+        status = ''
+        tags = []
         
+        # 1. Extract parameters from 'parameters' list (Bedrock Agent format)
+        if 'parameters' in event and isinstance(event['parameters'], list):
+            for param in event['parameters']:
+                param_name = param.get('name')
+                param_value = param.get('value')
+                
+                if param_name == 'action' and param_value:
+                    action = str(param_value).lower()
+                elif param_name == 'ticket_id' and param_value:
+                    ticket_id = str(param_value)
+                elif param_name == 'title' and param_value:
+                    title = str(param_value)
+                elif param_name == 'description' and param_value:
+                    description = str(param_value)
+                elif param_name == 'category' and param_value:
+                    category = str(param_value).lower()
+                elif param_name == 'requester' and param_value:
+                    requester = str(param_value)
+                elif param_name == 'priority' and param_value:
+                    priority = str(param_value).lower()
+                elif param_name == 'assigned_to' and param_value:
+                    assigned_to = str(param_value)
+                elif param_name == 'status' and param_value:
+                    status = str(param_value).lower()
+                elif param_name == 'tags' and param_value:
+                    # Handle tags as comma-separated string or list
+                    if isinstance(param_value, str):
+                        tags = [tag.strip() for tag in param_value.split(',') if tag.strip()]
+                    elif isinstance(param_value, list):
+                        tags = param_value
+        
+        # 2. Fallback to direct key extraction (for testing or other integrations)
+        if not action and event.get('action'):
+            action = str(event['action']).lower()
+        if not ticket_id and event.get('ticket_id'):
+            ticket_id = str(event['ticket_id'])
+        if not title and event.get('title'):
+            title = str(event['title'])
+        if not description and event.get('description'):
+            description = str(event['description'])
+        if not category and event.get('category'):
+            category = str(event['category']).lower()
+        if not requester and event.get('requester'):
+            requester = str(event['requester'])
+        if not priority or priority == 'medium':
+            if event.get('priority'):
+                priority = str(event['priority']).lower()
+        if not assigned_to and event.get('assigned_to'):
+            assigned_to = str(event['assigned_to'])
+        if not status and event.get('status'):
+            status = str(event['status']).lower()
+        if not tags and event.get('tags'):
+            if isinstance(event['tags'], str):
+                tags = [tag.strip() for tag in event['tags'].split(',') if tag.strip()]
+            elif isinstance(event['tags'], list):
+                tags = event['tags']
+            
+        print(f"DEBUG: Extracted parameters - action: '{action}', ticket_id: '{ticket_id}', title: '{title}'")
+        
+        request_id = event.get('requestId', f'req-{int(datetime.now().timestamp())}')
+        
+        # Validate action parameter
         if not action:
-            error_response = {
-                'statusCode': 400,
-                'body': json.dumps({
-                    'success': False,
-                    'error': 'Missing required parameter: action',
-                    'valid_actions': ['create', 'status', 'update', 'list'],
-                    'timestamp': datetime.now().isoformat()
-                })
+            service = TicketCreationService()
+            error_details = service._error_response("Missing required parameter: action. Valid actions: create, status, update, list")
+            
+            responseBody_for_error = {
+                "TEXT": {
+                    "body": json.dumps(error_details, default=str)
+                }
             }
-            logger.warning("Missing action parameter in request")
-            return error_response
+            return {
+                'messageVersion': messageVersion,
+                'response': {
+                    'actionGroup': actionGroup,
+                    'function': function,
+                    'functionResponse': {
+                        'responseBody': responseBody_for_error
+                    }
+                }
+            }
+        
+        logger.info(f"🎫 Processing ticket {action} request", 
+                   context={
+                       'requestId': request_id, 
+                       'action': action,
+                       'ticket_id': ticket_id if ticket_id else 'N/A'
+                   })
         
         # Initialize service
         service = TicketCreationService()
         
         # Route to appropriate action handler
         if action == 'create':
-            ticket_data = event.get('ticket_data', {})
+            # Build ticket data from extracted parameters
+            ticket_data = {
+                'title': title,
+                'description': description,
+                'category': category,
+                'requester': requester,
+                'priority': priority,
+                'assigned_to': assigned_to if assigned_to else None,
+                'tags': tags
+            }
             result = service.create_ticket(ticket_data)
             
         elif action == 'status':
-            ticket_id = event.get('ticket_id')
             if not ticket_id:
-                result = {'success': False, 'error': 'Missing ticket_id for status action'}
+                result = service._error_response('Missing ticket_id for status action')
             else:
                 result = service.get_ticket_status(ticket_id)
                 
         elif action == 'update':
-            ticket_id = event.get('ticket_id')
-            updates = event.get('updates', {})
             if not ticket_id:
-                result = {'success': False, 'error': 'Missing ticket_id for update action'}
+                result = service._error_response('Missing ticket_id for update action')
             else:
+                # Build updates from extracted parameters
+                updates = {}
+                if status:
+                    updates['status'] = status
+                if priority and priority != 'medium':  # Only include if not default
+                    updates['priority'] = priority
+                if assigned_to:
+                    updates['assigned_to'] = assigned_to
+                if description:
+                    updates['description'] = description
+                if tags:
+                    updates['tags'] = tags
+                    
                 result = service.update_ticket(ticket_id, updates)
                 
         elif action == 'list':
-            filters = event.get('filters')
-            result = service.list_tickets(filters)
+            # Build filters from extracted parameters
+            filters = {}
+            if category:
+                filters['category'] = category
+            if status:
+                filters['status'] = status
+            if requester:
+                filters['requester'] = requester
+                
+            result = service.list_tickets(filters if filters else None)
             
         else:
-            result = {
-                'success': False,
-                'error': f'Invalid action: {action}',
-                'valid_actions': ['create', 'status', 'update', 'list']
-            }
+            result = service._error_response(f'Invalid action: {action}. Valid actions: create, status, update, list')
         
-        # Prepare Lambda response
-        if result.get('success', False):
-            response = {
-                'statusCode': 200,
-                'body': json.dumps(result),
-                'headers': {
-                    'Content-Type': 'application/json'
-                }
-            }
-            logger.info(f"Ticket {action} action successful")
-        else:
-            response = {
-                'statusCode': 400,
-                'body': json.dumps(result),
-                'headers': {
-                    'Content-Type': 'application/json'
-                }
-            }
-            logger.warning(f"Ticket {action} action failed")
+        logger.info(f"✅ Ticket {action} action completed", 
+                   context={
+                       'requestId': request_id, 
+                       'action': action,
+                       'success': result.get('success', False)
+                   })
         
-        return response
-        
-    except Exception as e:
-        logger.error("Ticket Creation Lambda handler failed", context=None, error=e)
-        
-        error_response = {
-            'statusCode': 500,
-            'body': json.dumps({
-                'success': False,
-                'error': f'Internal server error: {str(e)}',
-                'timestamp': datetime.now().isoformat()
-            }),
-            'headers': {
-                'Content-Type': 'application/json'
+        # *** Format response for Bedrock Agent ***
+        responseBody_for_success = {
+            "TEXT": {
+                "body": json.dumps(result, default=str)
             }
         }
         
-        return error_response 
+        action_response = {
+            'actionGroup': actionGroup,
+            'function': function,
+            'functionResponse': {
+                'responseBody': responseBody_for_success
+            }
+        }
+
+        final_response = {
+            'messageVersion': messageVersion,
+            'response': action_response
+        }
+        
+        print(f"DEBUG: Final Lambda response: {json.dumps(final_response, indent=2)}")
+        return final_response
+        
+    except Exception as e:
+        logger.error(f"❌ Ticket Creation Lambda execution failed", 
+                    context={'requestId': event.get('requestId', 'unknown')}, 
+                    error=e)
+        
+        # *** Format error response for Bedrock Agent ***
+        service = TicketCreationService()
+        error_details = service._error_response(f"Internal server error: {str(e)}")
+        
+        responseBody_for_error = {
+            "TEXT": {
+                "body": json.dumps(error_details, default=str)
+            }
+        }
+        
+        error_action_response = {
+            'actionGroup': actionGroup,
+            'function': function,
+            'functionResponse': {
+                'responseBody': responseBody_for_error
+            }
+        }
+        
+        final_error_response = {
+            'messageVersion': messageVersion,
+            'response': error_action_response
+        }
+        
+        print(f"DEBUG: Final Lambda error response: {json.dumps(final_error_response, indent=2)}")
+        return final_error_response 

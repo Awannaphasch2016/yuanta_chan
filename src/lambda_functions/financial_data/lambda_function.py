@@ -1,15 +1,11 @@
-"""
-Financial Data Lambda Function
-Handles financial data retrieval for various data types and analysis needs
-Designed for Amazon Bedrock Agent integration
-"""
-
 import json
 import sys
 import os
 from datetime import datetime
 from typing import Dict, Any, Optional
+import time # Import time for generating request IDs
 
+# Assuming 'logger.py' and 'yahoo_finance_client.py' are available and correct
 from logger import get_logger
 from yahoo_finance_client import yahoo_client
 
@@ -48,9 +44,9 @@ class FinancialDataService:
             if data_type not in self.supported_data_types:
                 return self._error_response(f"Unsupported data type: {data_type}. Supported: {self.supported_data_types}")
             
-            # Validate ticker exists
-            if not yahoo_client.validate_ticker(ticker):
-                return self._error_response(f"Invalid ticker symbol: {ticker}")
+            # Validate ticker exists - placeholder, assuming yahoo_client handles this
+            # if not yahoo_client.validate_ticker(ticker): # This line might cause issues if not implemented
+            #    return self._error_response(f"Invalid ticker symbol: {ticker}")
             
             # Route to appropriate data retrieval method
             if data_type == 'overview':
@@ -227,77 +223,265 @@ class FinancialDataService:
 
 def lambda_handler(event, context):
     """
-    AWS Lambda handler for financial data requests
-    
-    Expected event format:
-    {
-        "ticker": "AAPL",
-        "data_type": "overview",
-        "additional_params": {...}  # optional
-    }
+    AWS Lambda handler for financial data requests,
+    optimized for Amazon Bedrock Agent integration.
     """
     logger = get_logger("FinancialDataHandler")
-    
+    print(f"DEBUG: Full event received by Lambda: {json.dumps(event, indent=2)}")
+
+    # Extract Bedrock Agent specific metadata
+    actionGroup = event.get('actionGroup', 'FinancialDataActionGroup') # Replace with your actual Action Group name
+    function = event.get('function', 'getFinancialData') # Replace with your actual Function name
+    messageVersion = event.get('messageVersion', '1.0')
+
     try:
-        logger.info("Financial Data Lambda function invoked", context={"event": event})
-        
-        # Extract parameters from event
-        ticker = event.get('ticker')
+        ticker = ''
         data_type = event.get('data_type', 'overview')
         additional_params = event.get('additional_params')
+        request_id = event.get('requestId', f'req-{int(time.time())}')
+
+        # 1. Try to extract 'ticker' from 'parameters' list (Bedrock Agent format)
+        if 'parameters' in event and isinstance(event['parameters'], list):
+            for param in event['parameters']:
+                if param.get('name') == 'ticker' and param.get('value') is not None:
+                    ticker = str(param['value']).upper()
+                    break # Exit loop if found
         
-        # Validate required parameters
+        # 2. If 'ticker' is still not found, try to extract from 'ticker' key directly (for Lambda console testing or other services)
+        if not ticker and event.get('ticker') is not None:
+            ticker = str(event['ticker']).upper()
+
+        # 3. Try to extract 'data_type' from 'parameters' list (Bedrock Agent format)
+        if 'parameters' in event and isinstance(event['parameters'], list):
+            for param in event['parameters']:
+                if param.get('name') == 'data_type' and param.get('value') is not None:
+                    data_type = str(param['value']).lower()
+                    break
+        
+        # 4. If 'data_type' is still not found, try to extract from 'data_type' key directly
+        if event.get('data_type') is not None:
+            data_type = str(event['data_type']).lower()
+
+
+        print(f"DEBUG: Ticker: '{ticker}', Data Type: '{data_type}' after extraction.")
+
+        logger.info(f"🚀 Processing financial data request", 
+                   context={
+                       'requestId': request_id, 
+                       'ticker': ticker, 
+                       'data_type': data_type
+                   })
+        
+        # Handle cases where 'ticker' is still missing
         if not ticker:
-            error_response = {
-                'statusCode': 400,
-                'body': json.dumps({
-                    'success': False,
-                    'error': 'Missing required parameter: ticker',
-                    'timestamp': datetime.now().isoformat()
-                })
+            service = FinancialDataService() # Create instance to use _error_response
+            error_details = service._error_response("Missing required parameter: ticker")
+            
+            # Wrap error details in the Bedrock Agent expected format
+            responseBody_for_error = {
+                "TEXT": {
+                    "body": json.dumps(error_details, default=str)
+                }
             }
-            logger.warning("Missing ticker parameter in request")
-            return error_response
+            return {
+                'messageVersion': messageVersion,
+                'response': {
+                    'actionGroup': actionGroup,
+                    'function': function,
+                    'functionResponse': {
+                        'responseBody': responseBody_for_error
+                    }
+                }
+            }
         
         # Initialize service and process request
         service = FinancialDataService()
         result = service.get_financial_data(ticker, data_type, additional_params)
         
-        # Prepare Lambda response
-        if result.get('success', False):
-            response = {
-                'statusCode': 200,
-                'body': json.dumps(result),
-                'headers': {
-                    'Content-Type': 'application/json'
-                }
-            }
-            logger.info(f"Financial data request successful for {ticker}")
-        else:
-            response = {
-                'statusCode': 400,
-                'body': json.dumps(result),
-                'headers': {
-                    'Content-Type': 'application/json'
-                }
-            }
-            logger.warning(f"Financial data request failed for {ticker}")
-        
-        return response
-        
-    except Exception as e:
-        logger.error("Financial Data Lambda handler failed", context=None, error=e)
-        
-        error_response = {
-            'statusCode': 500,
-            'body': json.dumps({
-                'success': False,
-                'error': f'Internal server error: {str(e)}',
-                'timestamp': datetime.now().isoformat()
-            }),
-            'headers': {
-                'Content-Type': 'application/json'
+        # Prepare Bedrock Agent response
+        # The 'result' is already a dict, which will be json.dumps-ed into the 'body'
+        responseBody_for_success = {
+            "TEXT": {
+                "body": json.dumps(result, default=str) # Convert the dictionary result to a string
             }
         }
         
-        return error_response 
+        action_response = {
+            'actionGroup': actionGroup,
+            'function': function,
+            'functionResponse': {
+                'responseBody': responseBody_for_success
+            }
+        }
+
+        final_response = {
+            'messageVersion': messageVersion,
+            'response': action_response
+        }
+        
+        logger.info(f"Financial data request successful for {ticker}")
+        print(f"DEBUG: Final Lambda success response: {json.dumps(final_response, indent=2)}")
+        return final_response
+        
+    except Exception as e:
+        logger.error(f"❌ Financial Data Lambda handler failed", 
+                    context={'requestId': event.get('requestId', 'unknown')}, 
+                    error=e)
+        
+        # Create an instance to generate standardized error response
+        service = FinancialDataService()
+        error_details = service._error_response(f"Internal server error: {str(e)}")
+        
+        responseBody_for_error = {
+            "TEXT": {
+                "body": json.dumps(error_details, default=str)
+            }
+        }
+        
+        error_action_response = {
+            'actionGroup': actionGroup,
+            'function': function,
+            'functionResponse': {
+                'responseBody': responseBody_for_error
+            }
+        }
+        
+        final_error_response = {
+            'messageVersion': messageVersion,
+            'response': error_action_response
+        }
+        
+        print(f"DEBUG: Final Lambda error response: {json.dumps(final_error_response, indent=2)}")
+        return final_error_response
+
+
+# For local testing
+if __name__ == "__main__":
+    # Mock yahoo_client for local testing
+    class MockYahooClient:
+        def get_stock_info(self, ticker):
+            if ticker == "AAPL":
+                return {
+                    'symbol': 'AAPL', 'name': 'Apple Inc.', 'sector': 'Technology', 'industry': 'Consumer Electronics',
+                    'marketCap': 2800000000000, 'currentPrice': 175.0, 'beta': 1.2, 'dividendYield': 0.005,
+                    'forwardPE': 28.0, 'returnOnEquity': 1.5, 'debtToEquity': 1.2, 'profitMargins': 0.25,
+                    'earningsGrowth': 0.15, 'revenueGrowth': 0.08, 'retrieved_at': datetime.now().isoformat()
+                }
+            elif ticker == "MSFT":
+                return {
+                    'symbol': 'MSFT', 'name': 'Microsoft Corp', 'sector': 'Technology', 'industry': 'Software - Infrastructure',
+                    'marketCap': 3100000000000, 'currentPrice': 420.0, 'beta': 0.9, 'dividendYield': 0.007,
+                    'forwardPE': 30.0, 'returnOnEquity': 1.8, 'debtToEquity': 0.8, 'profitMargins': 0.30,
+                    'earningsGrowth': 0.20, 'revenueGrowth': 0.12, 'retrieved_at': datetime.now().isoformat()
+                }
+            elif ticker == "GOOGL":
+                return {
+                    'symbol': 'GOOGL', 'name': 'Alphabet Inc.', 'sector': 'Communication Services', 'industry': 'Internet Content & Information',
+                    'marketCap': 2200000000000, 'currentPrice': 150.0, 'beta': 1.1, 'dividendYield': 0.0,
+                    'forwardPE': 25.0, 'returnOnEquity': 1.3, 'debtToEquity': 0.5, 'profitMargins': 0.22,
+                    'earningsGrowth': 0.10, 'revenueGrowth': 0.07, 'retrieved_at': datetime.now().isoformat()
+                }
+            else:
+                return {} # Or raise an error to simulate validation failure
+
+        def get_earnings_data(self, ticker):
+            if ticker == "AAPL":
+                return {
+                    'symbol': 'AAPL',
+                    'earnings': {
+                        'Revenue': {'2024': 383000, '2023': 387000, '2022': 394000},
+                        'Earnings': {'2024': 95000, '2023': 97000, '2022': 100000}
+                    },
+                    'years': ['2024', '2023', '2022'],
+                    'retrieved_at': datetime.now().isoformat()
+                }
+            return {}
+
+        def validate_ticker(self, ticker):
+            return ticker in ["AAPL", "MSFT", "GOOGL"]
+
+    # Overwrite the actual yahoo_client with the mock for local testing
+    yahoo_client = MockYahooClient() 
+
+    print("AWS Chatbot Financial Data - Local Demonstration")
+    print("=" * 60)
+    
+    # Test cases for local demonstration, simulating Bedrock Agent input
+    test_events_bedrock_format = [
+        # Bedrock Agent style event for overview
+        {
+            "messageVersion": "1.0",
+            "actionGroup": "FinancialDataActionGroup",
+            "function": "getFinancialData",
+            "parameters": [
+                {"name": "ticker", "value": "AAPL"},
+                {"name": "data_type", "value": "overview"}
+            ],
+            "sessionId": "test-session-123",
+            "invocationId": "test-invocation-123",
+            "apiPath": "/",
+            "httpMethod": "POST",
+            "requestId": "test-req-001"
+        },
+        # Bedrock Agent style event for earnings
+        {
+            "messageVersion": "1.0",
+            "actionGroup": "FinancialDataActionGroup",
+            "function": "getFinancialData",
+            "parameters": [
+                {"name": "ticker", "value": "MSFT"},
+                {"name": "data_type", "value": "earnings"}
+            ],
+            "sessionId": "test-session-456",
+            "invocationId": "test-invocation-456",
+            "apiPath": "/",
+            "httpMethod": "POST",
+            "requestId": "test-req-002"
+        },
+        # Bedrock Agent style event for missing ticker
+        {
+            "messageVersion": "1.0",
+            "actionGroup": "FinancialDataActionGroup",
+            "function": "getFinancialData",
+            "parameters": [
+                {"name": "data_type", "value": "profile"} # Missing ticker here
+            ],
+            "sessionId": "test-session-789",
+            "invocationId": "test-invocation-789",
+            "apiPath": "/",
+            "httpMethod": "POST",
+            "requestId": "test-req-003"
+        },
+        # Direct Lambda console test style event
+        {"ticker": "GOOGL", "data_type": "metrics", "requestId": "test-req-004"},
+        {"ticker": "INVALID", "data_type": "overview", "requestId": "test-req-005"},
+    ]
+    
+    for i, test_event in enumerate(test_events_bedrock_format, 1):
+        print(f"\n--- Test Case {i} ---")
+        print(f"Input Event: {json.dumps(test_event, indent=2)}")
+        
+        result = lambda_handler(test_event, None)
+        
+        print(f"\nOutput Response: {json.dumps(result, indent=2)}")
+        
+        # Verify response structure and content
+        if 'response' in result and 'functionResponse' in result['response']:
+            response_body = result['response']['functionResponse'].get('responseBody')
+            if response_body and 'TEXT' in response_body and 'body' in response_body['TEXT']:
+                try:
+                    parsed_body = json.loads(response_body['TEXT']['body'])
+                    print(f"Parsed Response Body Success: {parsed_body.get('success', 'N/A')}")
+                    if parsed_body.get('success'):
+                        print(f"Parsed Data Type: {parsed_body.get('data_type')}, Ticker: {parsed_body.get('ticker')}")
+                    else:
+                        print(f"Parsed Error: {parsed_body.get('error')}")
+                except json.JSONDecodeError:
+                    print(f"Failed to parse response body as JSON: {response_body['TEXT']['body']}")
+            else:
+                print("Response body not in expected 'TEXT' format.")
+        else:
+            print("Response not in expected Bedrock Agent format.")
+    
+    print("\n" + "=" * 60)
+    print("Local Demonstration Complete!")

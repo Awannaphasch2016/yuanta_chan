@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Implementation Approaches</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* bg-gray-900 */
+            color: #F9FAFB; /* text-gray-50 */
+        }
+        .slide {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+        .slide.active {
+            display: block;
+            opacity: 1;
+        }
+        .code-block {
+            background-color: #1F2937; /* bg-gray-800 */
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            overflow-x: auto;
+            color: #d1d5db; /* text-gray-300 */
+        }
+        .code-block .comment {
+            color: #6B7280; /* text-gray-500 */
+        }
+        .code-block .keyword {
+            color: #F472B6; /* text-pink-400 */
+        }
+        .code-block .string {
+            color: #A7F3D0; /* text-emerald-200 */
+        }
+        .code-block .function {
+            color: #60A5FA; /* text-blue-400 */
+        }
+        .code-block .variable {
+            color: #FBBF24; /* text-amber-400 */
+        }
+
+        .arrow {
+            font-size: 1.5rem;
+            color: #9CA3AF; /* text-gray-400 */
+            margin: 0 0.5rem;
+        }
+
+        /* Fade transition for slides */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .active {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
+
+    <div id="presentation-container" class="w-full max-w-5xl bg-gray-800/50 backdrop-blur-sm shadow-2xl rounded-2xl overflow-hidden border border-gray-700">
+        <div class="p-8 min-h-[600px] flex flex-col justify-center">
+
+            <!-- Slide 1: Title -->
+            <div class="slide active">
+                <div class="text-center">
+                    <div class="text-sm font-semibold text-blue-400 uppercase tracking-widest">Chatbot Implementation</div>
+                    <h1 class="mt-4 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white">
+                        Three Paths to a "Company Profile" Bot
+                    </h1>
+                    <p class="mt-6 text-lg text-gray-300 max-w-2xl mx-auto">
+                        A comparative look at AWS Bedrock, Google Dialogflow, and n8n for building intelligent, data-driven conversational agents.
+                    </p>
+                    <p class="mt-2 text-xs text-gray-500">June 16, 2025</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: The Core Conversation -->
+            <div class="slide">
+                <h2 class="text-3xl font-bold text-center text-white">The Core Conversation</h2>
+                <p class="mt-2 text-center text-gray-400">Our goal is to build a chatbot that can handle this multi-turn dialogue.</p>
+                <div class="mt-8 space-y-6">
+                    <div class="flex items-start space-x-4">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">U</div>
+                        <div class="bg-gray-700 p-4 rounded-lg rounded-tl-none">
+                            <p>"Tell me about Apple Inc."</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start justify-end space-x-4">
+                        <div class="bg-blue-600 p-4 rounded-lg rounded-tr-none text-right">
+                            <p>Apple Inc. designs, manufactures, and markets smartphones, PCs, tablets, and wearables...</p>
+                            <p class="text-blue-200 mt-2 text-sm">Would you like to know how it makes money or who its key executives are?</p>
+                        </div>
+                         <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-900 border-2 border-blue-500 flex items-center justify-center text-white font-bold">B</div>
+                    </div>
+                     <div class="flex items-start space-x-4">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">U</div>
+                        <div class="bg-gray-700 p-4 rounded-lg rounded-tl-none">
+                            <p>"How does it make money?"</p>
+                        </div>
+                    </div>
+                     <div class="flex items-start justify-end space-x-4">
+                        <div class="bg-blue-600 p-4 rounded-lg rounded-tr-none text-right">
+                            <p>Apple's primary revenue source is the iPhone. Other significant streams include its Services division (App Store, iCloud), Mac, iPad, and Wearables.</p>
+                        </div>
+                         <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-900 border-2 border-blue-500 flex items-center justify-center text-white font-bold">B</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Slide 3: Approach 1: AWS Bedrock Agent -->
+            <div class="slide">
+                <div class="text-sm font-semibold text-blue-400 uppercase tracking-widest">Approach 1</div>
+                <h2 class="text-3xl font-bold mt-2 text-white">AWS Bedrock Agent</h2>
+                <p class="mt-4 text-lg text-gray-300">An LLM-native approach where the agent orchestrates "tools" (Lambda functions) to perform actions based on natural language understanding.</p>
+                
+                <div class="mt-8 text-center">
+                    <h3 class="text-xl font-semibold">Architecture</h3>
+                    <div class="mt-4 flex items-center justify-center text-lg flex-wrap">
+                        <span>User</span>
+                        <span class="arrow">&rarr;</span>
+                        <span class="bg-gray-700 px-3 py-1 rounded-md">Bedrock Agent</span>
+                        <span class="arrow">&rarr;</span>
+                        <span class="bg-yellow-600/30 text-yellow-300 px-3 py-1 rounded-md">Lambda Tool</span>
+                        <span class="arrow">&rarr;</span>
+                        <span class="bg-gray-700 px-3 py-1 rounded-md">External API</span>
+                    </div>
+                </div>
+
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold text-lg">Key Components</h4>
+                        <ul class="mt-2 list-disc list-inside text-gray-300 space-y-1">
+                            <li><strong class="text-white">Bedrock Agent:</strong> The "brain" that manages conversation flow.</li>
+                            <li><strong class="text-white">Lambda Function:</strong> A "tool" containing business logic to fetch data.</li>
+                            <li><strong class="text-white">Agent Instructions:</strong> A natural language prompt telling the agent how to behave and which tools to use.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-lg">Best For</h4>
+                        <ul class="mt-2 list-disc list-inside text-gray-300 space-y-1">
+                            <li>Teams already invested in the AWS ecosystem.</li>
+                            <li>Rapid prototyping with complex, multi-step reasoning.</li>
+                            <li>Developers comfortable with serverless architecture.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: AWS Bedrock Implementation -->
+            <div class="slide">
+                 <h2 class="text-3xl font-bold text-white">AWS Bedrock: Implementation</h2>
+                 <p class="mt-2 text-gray-400">Implementation revolves around defining a Lambda tool and instructing the agent.</p>
+                 <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-semibold text-lg mb-2">1. Lambda Tool Input Schema</h3>
+                        <div class="code-block">
+<pre><code>{
+  "<span class="variable">ticker</span>": <span class="string">"string"</span>,
+  "<span class="variable">queryType</span>": <span class="string">"string"</span> <span class="comment">// e.g., "businessSummary"</span>
+}</code></pre>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-lg mb-2">2. Lambda Tool Output Schema</h3>
+                        <div class="code-block">
+<pre><code>{
+  "<span class="variable">ticker</span>": <span class="string">"AAPL"</span>,
+  "<span class="variable">revenueStreams</span>": [
+    { "<span class="variable">segment</span>": <span class="string">"iPhone"</span>, "<span class="variable">percentage</span>": <span class="string">52.0</span> },
+    { "<span class="variable">segment</span>": <span class="string">"Services"</span>, "<span class="variable">percentage</span>": <span class="string">20.0</span> }
+  ]
+}</code></pre>
+                        </div>
+                    </div>
+                 </div>
+                 <div class="mt-6">
+                    <h3 class="font-semibold text-lg mb-2">3. Agent Instructions (Natural Language)</h3>
+                    <div class="code-block">
+                        <p class="whitespace-pre-wrap"><span class="comment">// In the Bedrock Agent Console...</span>
+<span class="keyword">When</span> a user asks how a company makes money, <span class="function">use</span> the <span class="variable">CompanyProfileTool</span> with the <span class="variable">queryType</span> '<span class="string">revenueStreams</span>'. <span class="keyword">Always</span> identify the company's stock ticker.</p>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- Slide 5: Approach 2: Google Dialogflow CX -->
+            <div class="slide">
+                <div class="text-sm font-semibold text-purple-400 uppercase tracking-widest">Approach 2</div>
+                <h2 class="text-3xl font-bold mt-2 text-white">Google Dialogflow CX</h2>
+                <p class="mt-4 text-lg text-gray-300">A structured, state machine-based platform where conversation flows are explicitly designed using pages, intents, and routes.</p>
+
+                <div class="mt-8 text-center">
+                    <h3 class="text-xl font-semibold">Architecture</h3>
+                    <div class="mt-4 flex items-center justify-center text-lg flex-wrap">
+                        <span>User</span>
+                        <span class="arrow">&rarr;</span>
+                        <span class="bg-gray-700 px-3 py-1 rounded-md">Dialogflow CX</span>
+                        <span class="arrow">&rarr;</span>
+                        <span class="bg-purple-600/30 text-purple-300 px-3 py-1 rounded-md">Webhook</span>
+                        <span class="arrow">&rarr;</span>
+                        <span class="bg-gray-700 px-3 py-1 rounded-md">External API</span>
+                    </div>
+                </div>
+
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold text-lg">Key Components</h4>
+                        <ul class="mt-2 list-disc list-inside text-gray-300 space-y-1">
+                            <li><strong class="text-white">Intents:</strong> What the user wants to do (e.g., `get_company_revenue`).</li>
+                            <li><strong class="text-white">Entities:</strong> Keywords to extract (e.g., `@company-name`).</li>
+                            <li><strong class="text-white">Flows & Pages:</strong> Visual representation of the conversation path.</li>
+                            <li><strong class="text-white">Webhook:</strong> Backend code (e.g., Cloud Function) to fetch dynamic data.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-lg">Best For</h4>
+                        <ul class="mt-2 list-disc list-inside text-gray-300 space-y-1">
+                            <li>Structured, goal-oriented conversations (e.g., customer support, booking).</li>
+                            <li>Visual designers and teams who prefer low-code environments.</li>
+                            <li>Projects requiring explicit control over every conversational turn.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: Dialogflow Implementation -->
+            <div class="slide">
+                 <h2 class="text-3xl font-bold text-white">Dialogflow CX: Implementation</h2>
+                 <p class="mt-2 text-gray-400">Implementation focuses on defining intents and a webhook for data fetching.</p>
+                 <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-semibold text-lg mb-2">1. Define an Intent</h3>
+                        <div class="code-block">
+                            <p><span class="variable">Intent Display Name</span>: <span class="string">get_company_revenue</span></p>
+                            <p class="mt-4"><span class="variable">Training Phrases</span>:</p>
+                            <ul class="list-disc list-inside ml-4 mt-1">
+                                <li>"How does <span class="function">@company-name</span> make money?"</li>
+                                <li>"What are <span class="function">@company-name's</span> revenue streams?"</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-lg mb-2">2. Design a Page Route</h3>
+                        <div class="code-block">
+                           <p><span class="keyword">IF</span> intent IS <span class="string">get_company_revenue</span></p>
+                           <p><span class="keyword">THEN</span></p>
+                           <p class="ml-4"><span class="function">CALL</span> webhook <span class="string">companyInfoWebhook</span></p>
+                           <p class="ml-4"><span class="function">RESPOND</span> with <span class="string">"According to their filings, $session.params.revenue_summary"</span></p>
+                        </div>
+                    </div>
+                 </div>
+                 <div class="mt-6">
+                    <h3 class="font-semibold text-lg mb-2">3. Webhook (Google Cloud Function) Logic</h3>
+                    <div class="code-block">
+<pre><code><span class="comment">// Pseudocode</span>
+<span class="keyword">async function</span> <span class="function">companyInfoWebhook</span>(req, res) {
+  <span class="comment">// 1. Get company name from Dialogflow request</span>
+  <span class="keyword">const</span> companyName = req.body.sessionInfo.parameters['company-name'];
+  
+  <span class="comment">// 2. Call external API to get data</span>
+  <span class="keyword">const</span> apiData = <span class="keyword">await</span> <span class="function">fetchData</span>(companyName);
+
+  <span class="comment">// 3. Format response for Dialogflow</span>
+  <span class="keyword">const</span> response = {
+    session_info: {
+      parameters: { <span class="variable">revenue_summary</span>: apiData.summary }
+    }
+  };
+  
+  res.<span class="function">send</span>(response);
+}</code></pre>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- Slide 7: Approach 3: n8n -->
+            <div class="slide">
+                <div class="text-sm font-semibold text-green-400 uppercase tracking-widest">Approach 3</div>
+                <h2 class="text-3xl font-bold mt-2 text-white">n8n Workflow Automation</h2>
+                <p class="mt-4 text-lg text-gray-300">A flexible, node-based workflow tool where you chain services together. The "chatbot" is a workflow triggered by a webhook.</p>
+
+                <div class="mt-8 text-center">
+                    <h3 class="text-xl font-semibold">Architecture</h3>
+                    <div class="mt-4 flex items-center justify-center text-lg flex-wrap">
+                        <span class="bg-green-600/30 text-green-300 px-3 py-1 rounded-md">Webhook</span>
+                        <span class="arrow">&rarr;</span>
+                        <span class="bg-gray-700 px-3 py-1 rounded-md">LLM Node</span>
+                        <span class="arrow">&rarr;</span>
+                        <span class="bg-gray-700 px-3 py-1 rounded-md">HTTP Node</span>
+                        <span class="arrow">&rarr;</span>
+                        <span class="bg-gray-700 px-3 py-1 rounded-md">LLM Node</span>
+                    </div>
+                </div>
+
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold text-lg">Key Components</h4>
+                        <ul class="mt-2 list-disc list-inside text-gray-300 space-y-1">
+                            <li><strong class="text-white">Webhook Node:</strong> The entry point for user messages.</li>
+                            <li><strong class="text-white">LLM Node:</strong> Used for NLU (intent extraction) and NLG (response generation).</li>
+                            <li><strong class="text-white">HTTP Request Node:</strong> Calls any external API to get data.</li>
+                            <li><strong class="text-white">Code/Flow Logic:</strong> The visual connection between nodes defines the process.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-lg">Best For</h4>
+                        <ul class="mt-2 list-disc list-inside text-gray-300 space-y-1">
+                            <li>Integrating many different APIs and services.</li>
+                            <li>Engineers who think in terms of data flows and ETL.</li>
+                            <li>Maximum flexibility and control over the entire process.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+             <!-- Slide 8: n8n Implementation -->
+            <div class="slide">
+                 <h2 class="text-3xl font-bold text-white">n8n: Implementation</h2>
+                 <p class="mt-2 text-gray-400">Implementation is a chain of nodes, each performing a specific task.</p>
+                 <div class="space-y-4">
+                    <div class="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
+                        <h3 class="font-semibold text-green-300">Node 1: LLM (Extract Intent)</h3>
+                        <p class="text-sm text-gray-300 mt-1">Takes raw user query and outputs structured JSON.</p>
+                        <div class="mt-2 code-block text-xs">
+                            <span class="keyword">PROMPT:</span> Analyze the text `{{ $json.body.query }}` and return JSON with 'ticker' and 'queryType'.
+                        </div>
+                    </div>
+                     <div class="text-center text-gray-500">&darr;</div>
+                    <div class="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
+                        <h3 class="font-semibold text-green-300">Node 2: HTTP Request</h3>
+                        <p class="text-sm text-gray-300 mt-1">Uses JSON from the previous node to call the financial API.</p>
+                        <div class="mt-2 code-block text-xs">
+                           <span class="keyword">URL:</span> `https://financial-api.com?ticker={{ $node["LLM (Extract Intent)"].json.ticker }}`
+                        </div>
+                    </div>
+                     <div class="text-center text-gray-500">&darr;</div>
+                    <div class="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
+                        <h3 class="font-semibold text-green-300">Node 3: LLM (Generate Response)</h3>
+                        <p class="text-sm text-gray-300 mt-1">Takes API data and the original query to form a natural language answer.</p>
+                        <div class="mt-2 code-block text-xs">
+                            <span class="keyword">PROMPT:</span> Based on this data `{{ $node["HTTP Request"].json }}`, answer this question: `{{ $node["Webhook"].json.body.query }}`
+                        </div>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- Slide 9: Comparison -->
+            <div class="slide">
+                <h2 class="text-3xl font-bold text-center text-white">Comparison of Approaches</h2>
+                <div class="mt-6 flow-root">
+                    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                        <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                            <table class="min-w-full divide-y divide-gray-700">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-white sm:pl-0">Factor</th>
+                                        <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-white">AWS Bedrock Agent</th>
+                                        <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-white">Google Dialogflow CX</th>
+                                        <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-white">n8n</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-800">
+                                    <tr>
+                                        <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-white sm:pl-0">Core Paradigm</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">LLM-native Orchestration</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Visual State Machine</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Workflow Automation</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-white sm:pl-0">Learning Curve</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Moderate (Requires AWS knowledge)</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Low to Moderate (Visual)</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Low (Node-based logic)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-white sm:pl-0">Flexibility</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">High (Code-based tools)</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Moderate (Structured flows)</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Very High (Integrates anything)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-white sm:pl-0">Control</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Abstracted (Agent decides)</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Explicit (You define all paths)</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Granular (You control every step)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-white sm:pl-0">Best For...</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Complex reasoning & AWS shops</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Predictable, guided tasks</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-300">Complex data integration</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: Conclusion -->
+            <div class="slide">
+                 <div class="text-center">
+                    <h1 class="text-4xl sm:text-5xl font-bold tracking-tight text-white">
+                        Conclusion & Next Steps
+                    </h1>
+                    <p class="mt-6 text-lg text-gray-300 max-w-2xl mx-auto">
+                       Each platform offers a powerful but different path to building a conversational agent. The best choice depends on your team's existing skills, project requirements, and desired level of control.
+                    </p>
+                    <div class="mt-8">
+                         <div class="text-sm font-semibold text-blue-400 uppercase tracking-widest">Recommendation</div>
+                         <p class="mt-2 text-white">For the InHouse AI Chatbot project, <strong class="font-semibold">AWS Bedrock Agent</strong> aligns best with the existing PRD, leveraging the AWS-native ecosystem and providing a scalable foundation for future tool additions.</p>
+                    </div>
+                </div>
+            </div>
+
+
+        </div>
+
+        <!-- Navigation -->
+        <div class="bg-gray-900/50 p-4 flex items-center justify-between border-t border-gray-700">
+            <button id="prevBtn" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
+            <div id="slide-counter" class="text-sm text-gray-400"></div>
+            <button id="nextBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+        </div>
+    </div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const slideCounter = document.getElementById('slide-counter');
+        let currentSlide = 0;
+
+        function showSlide(n) {
+            slides.forEach((slide, index) => {
+                if (index === n) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+            updateNav();
+        }
+
+        function updateNav() {
+            prevBtn.disabled = currentSlide === 0;
+            nextBtn.disabled = currentSlide === slides.length - 1;
+            slideCounter.textContent = `Slide ${currentSlide + 1} of ${slides.length}`;
+        }
+
+        function nextSlide() {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+                showSlide(currentSlide);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                showSlide(currentSlide);
+            }
+        }
+
+        prevBtn.addEventListener('click', prevSlide);
+        nextBtn.addEventListener('click', nextSlide);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        // Initial setup
+        showSlide(currentSlide);
+    </script>
+
+</body>
+</html>

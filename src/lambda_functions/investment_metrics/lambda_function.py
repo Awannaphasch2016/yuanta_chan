@@ -543,22 +543,35 @@ def lambda_handler(event, context):
     """
     AWS Lambda handler for sequential investment analysis
     Optimized for board demonstration of AWS chatbot capabilities
-    
-    Expected event format:
-    {
-        "ticker": "AAPL",
-        "depth": "standard",  // "quick", "standard", "detailed"
-        "requestId": "optional-request-id"
-    }
     """
     logger = get_logger("InvestmentMetricsLambda")
-    
+    print(f"DEBUG: Full event received by Lambda: {json.dumps(event, indent=2)}")
+
+    # ดึงค่าที่จำเป็นสำหรับโครงสร้าง Bedrock Agent response จาก event ที่ได้รับมา
+    # ตรวจสอบให้แน่ใจว่า Key เหล่านี้มีอยู่ใน event
+    # ถ้าไม่มี แสดงว่า event ไม่ได้มาจาก Bedrock Agent หรือรูปแบบเปลี่ยนไป
+    actionGroup = event.get('actionGroup', 'InvestmentMetricsActionGroup') # ใส่ชื่อ Action Group ของคุณ
+    function = event.get('function', 'getInvestmentMetrics') # ใส่ชื่อ Function ของคุณ
+    messageVersion = event.get('messageVersion', '1.0') # Version ตามตัวอย่างที่ใช้ได้
+
     try:
-        # Extract parameters from event
-        ticker = event.get('ticker', '').upper()
+        ticker = ''
         depth = event.get('depth', 'standard')
         request_id = event.get('requestId', f'req-{int(time.time())}')
         
+        # 1. พยายามดึงค่า 'ticker' จาก 'parameters' list (รูปแบบจาก Bedrock Agent)
+        if 'parameters' in event and isinstance(event['parameters'], list):
+            for param in event['parameters']:
+                if param.get('name') == 'ticker' and param.get('value') is not None:
+                    ticker = str(param['value']).upper()
+                    break # ถ้าเจอแล้ว ออกจาก loop
+        
+        # 2. ถ้ายังไม่เจอ 'ticker' ให้ลองดึงจาก key 'ticker' โดยตรง (รูปแบบสำหรับการทดสอบใน Lambda console หรือบาง service)
+        if not ticker and event.get('ticker') is not None:
+            ticker = str(event['ticker']).upper()
+
+        print(f"DEBUG: Ticker value after extraction: '{ticker}'")
+
         logger.info(f"🚀 Processing sequential investment analysis", 
                    context={
                        'requestId': request_id, 
@@ -567,8 +580,28 @@ def lambda_handler(event, context):
                        'algorithm': 'Sequential Processing'
                    })
         
+        # จัดการกรณีที่ 'ticker' ยังคงหายไปหลังจากพยายามดึงทั้งสองรูปแบบ
         if not ticker:
-            raise ValueError("Missing required parameter: ticker")
+            analyzer = SequentialInvestmentAnalyzer()
+            # ใช้ _format_error_response เพื่อสร้าง Dict ของ Error Message
+            error_details = analyzer._format_error_response("unknown", "Missing required parameter: ticker")
+            
+            # ห่อหุ้ม Error Message ในรูปแบบที่ Bedrock Agent คาดหวัง
+            responseBody_for_error = {
+                "TEXT": { # ใช้ TEXT สำหรับข้อความ Error ทั่วไป
+                    "body": json.dumps(error_details, default=str) # ทำให้เป็น string
+                }
+            }
+            return {
+                'messageVersion': messageVersion,
+                'response': {
+                    'actionGroup': actionGroup,
+                    'function': function,
+                    'functionResponse': {
+                        'responseBody': responseBody_for_error
+                    }
+                }
+            }
         
         if depth not in ['quick', 'standard', 'detailed']:
             depth = 'standard'
@@ -576,19 +609,7 @@ def lambda_handler(event, context):
         
         # Perform sequential analysis
         analyzer = SequentialInvestmentAnalyzer()
-        result = analyzer.analyze(ticker, depth)
-        
-        # Format response for Bedrock Agent
-        response = {
-            'statusCode': 200,
-            'body': json.dumps(result, default=str),
-            'headers': {
-                'Content-Type': 'application/json',
-                'X-Request-ID': request_id,
-                'X-Algorithm': 'Sequential-Processing',
-                'X-Execution-Time': str(result.get('performance', {}).get('total_execution_time', 0))
-            }
-        }
+        result = analyzer.analyze(ticker, depth) # 'result' คือ Dict ที่ถูกจัดรูปแบบแล้วจาก _format_success_response หรือ _format_error_response
         
         execution_time = result.get('performance', {}).get('total_execution_time', 0)
         logger.info(f"✅ Sequential investment analysis completed successfully", 
@@ -599,29 +620,61 @@ def lambda_handler(event, context):
                        'recommendation': result.get('analysis', {}).get('recommendation', {}).get('recommendation', 'Unknown')
                    })
         
-        return response
+        # *** ส่วนสำคัญ: สร้าง Response ตามรูปแบบที่ Bedrock Agent คาดหวัง ***
+        # 'result' (จาก analyzer.analyze) เป็น Python Dict ที่มีข้อมูลการวิเคราะห์
+        # เราจะ json.dumps() มันให้เป็น string และใส่ไว้ใน 'body'
+        responseBody_for_success = {
+            "TEXT": {
+                "body": json.dumps(result, default=str) # ทำให้ Dict result เป็น string
+            }
+        }
+        
+        action_response = {
+            'actionGroup': actionGroup,
+            'function': function,
+            'functionResponse': {
+                'responseBody': responseBody_for_success
+            }
+        }
+
+        final_response = {
+            'messageVersion': messageVersion,
+            'response': action_response
+        }
+        
+        print(f"DEBUG: Final Lambda success response: {json.dumps(final_response, indent=2)}")
+        return final_response
         
     except Exception as e:
         logger.error(f"❌ Lambda execution failed", 
                     context={'requestId': event.get('requestId', 'unknown')}, 
                     error=e)
         
-        error_response = {
-            'statusCode': 500,
-            'body': json.dumps({
-                'success': False,
-                'error': str(e),
-                'ticker': event.get('ticker', 'unknown'),
-                'algorithm': 'Sequential Processing',
-                'timestamp': datetime.now().isoformat()
-            }),
-            'headers': {
-                'Content-Type': 'application/json',
-                'X-Request-ID': event.get('requestId', 'unknown')
+        # *** ส่วนสำคัญ: สร้าง Error Response ตามรูปแบบที่ Bedrock Agent คาดหวัง ***
+        analyzer = SequentialInvestmentAnalyzer() # สร้าง instance ใหม่สำหรับเรียกใช้ _format_error_response
+        error_details = analyzer._format_error_response(event.get('ticker', 'unknown'), str(e))
+        
+        responseBody_for_error = {
+            "TEXT": { # ใช้ TEXT สำหรับข้อความ Error ทั่วไป
+                "body": json.dumps(error_details, default=str) # ทำให้ Dict error_details เป็น string
             }
         }
         
-        return error_response
+        error_action_response = {
+            'actionGroup': actionGroup,
+            'function': function,
+            'functionResponse': {
+                'responseBody': responseBody_for_error
+            }
+        }
+        
+        final_error_response = {
+            'messageVersion': messageVersion,
+            'response': error_action_response
+        }
+        
+        print(f"DEBUG: Final Lambda error response: {json.dumps(final_error_response, indent=2)}")
+        return final_error_response
 
 
 # For local testing and board demonstration
