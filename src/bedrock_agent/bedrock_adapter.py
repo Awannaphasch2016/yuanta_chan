@@ -199,26 +199,25 @@ class BedrockAgentAdapter:
         """Route query to appropriate handler based on content"""
         query_lower = query.lower()
         
-        # Tool query patterns for investment analysis
-        tool_patterns = [
-            r"how does .+ make money",
+        # Investment analysis patterns
+        investment_patterns = [
             r"analyze .+ stock",
-            r"analyze .+",
-            r"financial data for .+",
             r"investment analysis",
-            r"stock analysis",
-            r"create ticket for .+",
-            r"ticker .+",
-            r"company analysis"
+            r"stock price",
+            r"financial data",
+            r"company metrics",
+            r"P/E ratio",
+            r"market cap",
+            r"revenue",
+            r"earnings"
         ]
         
-        # Check if query matches tool patterns
-        for pattern in tool_patterns:
+        # Check for investment-related queries
+        for pattern in investment_patterns:
             if re.search(pattern, query_lower):
-                self.logger.info(f"Query routed to tool handler: {pattern}")
                 return "tool"
         
-        self.logger.info("Query routed to conversation handler")
+        # Default to conversation for general queries
         return "conversation"
     
     def _handle_tool_query(self, query: str) -> str:

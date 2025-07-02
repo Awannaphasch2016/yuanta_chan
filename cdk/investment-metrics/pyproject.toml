@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "investment-metrics-cdk"
+version = "0.1.0"
+description = "CDK app for investment metrics Lambda function"
+authors = ["Yuanta Chan Team <team@yuanta-chan.com>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+aws-cdk-lib = "^2.201.0"
+constructs = "^10.4.2"
+python-dotenv = "^1.0.1"
+cdk-shared-constructs = {path = "../../cdk_shared_constructs", develop = true}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api" 

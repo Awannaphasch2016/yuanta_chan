@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "cdk-shared-constructs"
+version = "0.1.0"
+description = "Shared CDK constructs for Yuanta Chan investment platform"
+authors = ["Yuanta Chan Team <team@yuanta-chan.com>"]
+readme = "README.md"
+packages = [{include = "cdk_shared_constructs"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+aws-cdk-lib = "^2.201.0"
+constructs = "^10.4.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api" 

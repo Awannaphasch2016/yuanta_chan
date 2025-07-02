@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Investment Metrics CDK Application - Refactored with Shared Constructs
+Financial Data CDK Application - Built with Shared Constructs
 Clean, maintainable infrastructure using reusable CDK constructs
 """
 
@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 import aws_cdk as cdk
 from aws_cdk import Stack, CfnOutput
 from constructs import Construct
-from cdk_shared_constructs import InvestmentProcessor
+from cdk_shared_constructs import FinancialCollector
 
 # Configure logging
 logging.basicConfig(
@@ -36,11 +36,11 @@ SCRIPT_DIR = Path(__file__).parent.absolute()
 CDK_OUT_DIR = SCRIPT_DIR / "cdk.out"
 
 
-class InvestmentMetricsStack(Stack):
-    """Stack for deploying Investment Metrics Lambda using shared constructs"""
+class FinancialDataStack(Stack):
+    """Stack for deploying Financial Data Lambda using shared constructs"""
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
-        logger.info("STARTING InvestmentMetricsStack initialization...")
+        logger.info("STARTING FinancialDataStack initialization...")
         logger.info(f"   Construct ID: {construct_id}")
         logger.info(f"   Current working directory: {os.getcwd()}")
         
@@ -53,35 +53,43 @@ class InvestmentMetricsStack(Stack):
         logger.info(f"   AWS Account ID: {account_id}")
         logger.info(f"   AWS Region: {aws_region}")
         
-        # Create Investment Processor using shared construct
-        logger.info("Creating Investment Processor using shared construct...")
-        self.investment_processor = InvestmentProcessor(
-            self, "InvestmentProcessor",
-            lambda_code_path="../../src/lambda_functions/investment_metrics",
-            description="Investment analysis and metrics for AI chatbot - Refactored with shared constructs"
+        # Create Financial Collector using shared construct
+        logger.info("Creating Financial Collector using shared construct...")
+        self.financial_collector = FinancialCollector(
+            self, "FinancialCollector",
+            lambda_code_path="../../src/lambda_functions/financial_data",
+            environment="prod",
+            timeout=cdk.Duration.seconds(60),
+            memory_size=1024,
+            log_retention=cdk.aws_logs.RetentionDays.TWO_WEEKS,
+            description="Financial data collection and processing for investment analysis platform"
         )
-        logger.info("Investment Processor created successfully!")
+        logger.info("Financial Collector created successfully!")
         
         # Create outputs using the construct's Lambda function
         logger.info("Creating CloudFormation outputs...")
         CfnOutput(
-            self, "InvestmentMetricsLambdaArn",
-            value=self.investment_processor.function_arn,
-            description="Investment Metrics Lambda Function ARN"
+            self, "FinancialDataLambdaArn",
+            value=self.financial_collector.function_arn,
+            description="Financial Data Lambda Function ARN"
         )
         
         CfnOutput(
-            self, "InvestmentMetricsLambdaName", 
-            value=self.investment_processor.function_name,
-            description="Investment Metrics Lambda Function Name"
+            self, "FinancialDataLambdaName", 
+            value=self.financial_collector.function_name,
+            description="Financial Data Lambda Function Name"
         )
-        logger.info("CloudFormation outputs created successfully!")
         
-        logger.info("InvestmentMetricsStack initialization completed successfully!")
+        # Optional: Add environment variable for data source
+        self.financial_collector.add_environment_variable("DATA_SOURCE_VERSION", "v2.0")
+        self.financial_collector.add_environment_variable("CACHE_TTL", "300")
+        
+        logger.info("CloudFormation outputs created successfully!")
+        logger.info("FinancialDataStack initialization completed successfully!")
 
 
-class InvestmentMetricsApp(cdk.App):
-    """CDK Application for Investment Metrics using shared constructs"""
+class FinancialDataApp(cdk.App):
+    """CDK Application for Financial Data using shared constructs"""
     
     def __init__(self):
         logger.info("Initializing CDK Application...")
@@ -89,14 +97,14 @@ class InvestmentMetricsApp(cdk.App):
         logger.info(f"CDK output directory: {CDK_OUT_DIR}")
         super().__init__(outdir=str(CDK_OUT_DIR))
         
-        logger.info("Creating InvestmentMetricsStack...")
-        InvestmentMetricsStack(
-            self, "InvestmentMetricsStack",
+        logger.info("Creating FinancialDataStack...")
+        FinancialDataStack(
+            self, "FinancialDataStack",
             env=cdk.Environment(
                 account=os.getenv('AWS_ACCOUNT_ID'),
                 region=os.getenv('AWS_REGION')
             ),
-            description="Investment Metrics Lambda Function - Refactored with Shared Constructs"
+            description="Financial Data Lambda Function - Built with Shared Constructs"
         )
         logger.info("CDK Application initialization completed!")
 
@@ -109,7 +117,7 @@ def main():
     
     try:
         logger.info("Creating CDK Application instance...")
-app = InvestmentMetricsApp()
+        app = FinancialDataApp()
         
         logger.info("Starting synthesis process...")
         result = app.synth()

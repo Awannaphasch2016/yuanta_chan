@@ -22,17 +22,28 @@ class LambdaConfig:
         "investment-metrics": {
             "function_name": "InHouseAI-InvestmentMetrics",
             "description": "Investment analysis and metrics calculation",
-            "handler": "lambda_function.lambda_handler"
+            "handler": "lambda_function.lambda_handler",
+            "runtime": "python3.12",
+            "timeout": 60,
+            "memory_size": 1024,
+            "environment_variables": {
+                "LOG_LEVEL": "INFO",
+                "DATA_SOURCE": "yahoo_finance",
+                "CACHE_TTL": "300"
+            }
         },
         "financial-data": {
             "function_name": "InHouseAI-FinancialData",
-            "description": "Financial data retrieval service",
-            "handler": "lambda_function.lambda_handler"
-        },
-        "ticket-creation": {
-            "function_name": "InHouseAI-TicketCreation",
-            "description": "Internal ticketing system integration",
-            "handler": "lambda_function.lambda_handler"
+            "description": "Financial data retrieval and processing",
+            "handler": "lambda_function.lambda_handler",
+            "runtime": "python3.12",
+            "timeout": 60,
+            "memory_size": 1024,
+            "environment_variables": {
+                "LOG_LEVEL": "INFO",
+                "DATA_SOURCE": "yahoo_finance",
+                "API_VERSION": "v2"
+            }
         }
     }
     

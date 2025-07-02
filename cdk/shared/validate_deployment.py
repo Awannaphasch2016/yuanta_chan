@@ -262,20 +262,19 @@ class AWSCDKValidator:
         status = "PASS"
         
         # Check Lambda functions
-        lambda_dirs = [
+        lambda_paths = [
             "src/lambda_functions/investment_metrics",
-            "src/lambda_functions/financial_data",
-            "src/lambda_functions/ticket_creation"
+            "src/lambda_functions/financial_data"
         ]
         
-        for lambda_dir in lambda_dirs:
-            if os.path.exists(lambda_dir) and os.path.exists(f"{lambda_dir}/lambda_function.py"):
-                print(f"✅ Lambda function: {lambda_dir}")
-                details.append(f"Lambda ready: {os.path.basename(lambda_dir)}")
+        for lambda_path in lambda_paths:
+            if os.path.exists(lambda_path) and os.path.exists(f"{lambda_path}/lambda_function.py"):
+                print(f"✅ Lambda function: {lambda_path}")
+                details.append(f"Lambda ready: {os.path.basename(lambda_path)}")
             else:
-                print(f"❌ Lambda function missing: {lambda_dir}")
+                print(f"❌ Lambda function missing: {lambda_path}")
                 status = "FAIL"
-                details.append(f"Lambda missing: {os.path.basename(lambda_dir)}")
+                details.append(f"Lambda missing: {os.path.basename(lambda_path)}")
         
         # Check Bedrock adapter
         if os.path.exists("src/bedrock_agent/bedrock_adapter.py"):
