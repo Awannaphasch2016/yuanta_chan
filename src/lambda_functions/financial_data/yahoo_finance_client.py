@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import json
 import time
+import pandas as pd
 
 from logger import get_logger
 
@@ -162,6 +163,114 @@ class YahooFinanceClient:
         except Exception as e:
             self.logger.error(f"Failed to retrieve earnings data for {ticker}", error=e)
             raise Exception(f"Unable to fetch earnings data for {ticker}: {str(e)}")
+    
+    def get_historical_data(self, ticker: str, period: str = '1y', start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get historical price data for a ticker
+        
+        Args:
+            ticker: Stock ticker symbol
+            period: Time period for data (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
+            start_date: Start date in YYYY-MM-DD format (optional, overrides period)
+            end_date: End date in YYYY-MM-DD format (optional, defaults to today)
+            
+        Returns:
+            Dictionary containing historical price data
+        """
+        ticker = ticker.upper()
+        
+        try:
+            def _fetch_historical():
+                stock = yf.Ticker(ticker)
+                
+                if start_date and end_date:
+                    # Use specific date range
+                    hist_data = stock.history(start=start_date, end=end_date)
+                elif start_date:
+                    # Use start date to today
+                    hist_data = stock.history(start=start_date)
+                else:
+                    # Use period
+                    hist_data = stock.history(period=period)
+                
+                if hist_data is None or hist_data.empty:
+                    return {
+                        'symbol': ticker,
+                        'historical_data': None,
+                        'message': 'No historical data available for the specified period'
+                    }
+                
+                # Debug: Log available columns
+                self.logger.info(f"Available columns for {ticker}: {hist_data.columns.tolist()}")
+                
+                # Convert to dictionary format with dates as keys
+                hist_dict = {}
+                for date, row in hist_data.iterrows():
+                    date_str = date.strftime('%Y-%m-%d')
+                    
+                    # Safely extract values with fallbacks
+                    open_price = float(row['Open']) if 'Open' in row and not pd.isna(row['Open']) else None
+                    high_price = float(row['High']) if 'High' in row and not pd.isna(row['High']) else None
+                    low_price = float(row['Low']) if 'Low' in row and not pd.isna(row['Low']) else None
+                    close_price = float(row['Close']) if 'Close' in row and not pd.isna(row['Close']) else None
+                    volume = int(row['Volume']) if 'Volume' in row and not pd.isna(row['Volume']) else None
+                    
+                    # Handle Adj Close - use Close as fallback if Adj Close doesn't exist
+                    adj_close_price = None
+                    if 'Adj Close' in row and not pd.isna(row['Adj Close']):
+                        adj_close_price = float(row['Adj Close'])
+                    elif close_price is not None:
+                        adj_close_price = close_price  # Use Close as fallback
+                    
+                    hist_dict[date_str] = {
+                        'open': open_price,
+                        'high': high_price,
+                        'low': low_price,
+                        'close': close_price,
+                        'volume': volume,
+                        'adj_close': adj_close_price
+                    }
+                
+                # Calculate summary statistics
+                if hist_dict:
+                    prices = [data['close'] for data in hist_dict.values() if data['close'] is not None]
+                    if prices:
+                        current_price = prices[-1]
+                        start_price = prices[0]
+                        price_change = current_price - start_price
+                        price_change_percent = ((current_price - start_price) / start_price * 100) if start_price != 0 else 0
+                        
+                        summary = {
+                            'current_price': current_price,
+                            'start_price': start_price,
+                            'price_change': price_change,
+                            'price_change_percent': price_change_percent,
+                            'highest_price': max(prices),
+                            'lowest_price': min(prices),
+                            'data_points': len(prices)
+                        }
+                    else:
+                        summary = {'message': 'No valid price data available'}
+                else:
+                    summary = {'message': 'No historical data available'}
+                
+                return {
+                    'symbol': ticker,
+                    'period': period,
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'historical_data': hist_dict,
+                    'summary': summary,
+                    'retrieved_at': datetime.now().isoformat()
+                }
+            
+            data = self._retry_request(_fetch_historical)
+            self.logger.info(f"Successfully retrieved historical data for {ticker}")
+            return data
+            
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve historical data for {ticker}", error=e)
+            raise Exception(f"Unable to fetch historical data for {ticker}: {str(e)}")
     
     def validate_ticker(self, ticker: str) -> bool:
         """

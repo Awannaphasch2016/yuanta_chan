@@ -2,6 +2,54 @@
 Ticket Creation Lambda Function
 Handles internal ticket creation and management for investment consultant workflows
 Designed for Amazon Bedrock Agent integration
+
+BEDROCK AGENT PARAMETER GUIDE (5 PARAMETERS MAX):
+=================================================
+
+CONSOLIDATED PARAMETERS:
+-----------------------
+1. action (string, required): The operation to perform
+   - Valid values: "create", "status", "update", "list"
+   - Example: "create" for creating new tickets
+
+2. ticket_data (string, required for create): JSON string containing ticket information
+   - Format: JSON object with ticket fields
+   - Example: '{"title": "API issue", "description": "Rate limiting problem", "category": "technical", "requester": "john@company.com"}'
+   - Required fields for create: title, description, category, requester
+   - Optional fields: priority, assigned_to, tags
+
+3. ticket_id (string, required for status/update): Existing ticket identifier
+   - Format: "TIK-YYYYMMDD-XXXXXXXX"
+   - Example: "TIK-20241201-ABC12345"
+
+4. update_data (string, optional for update): JSON string containing fields to update
+   - Format: JSON object with update fields
+   - Example: '{"status": "in_progress", "assigned_to": "bob@company.com"}'
+   - Valid fields: status, priority, assigned_to, description, tags
+
+5. filters (string, optional for list): JSON string containing filter criteria
+   - Format: JSON object with filter fields
+   - Example: '{"category": "technical", "status": "open"}'
+   - Valid filters: category, status, requester
+
+ACTION-SPECIFIC EXAMPLES:
+========================
+CREATE TICKET:
+- action: "create"
+- ticket_data: '{"title": "API rate limiting issue", "description": "Yahoo Finance API returning 429 errors", "category": "technical", "requester": "alice@company.com", "priority": "high", "tags": "api,urgent"}'
+
+CHECK STATUS:
+- action: "status"
+- ticket_id: "TIK-20241201-ABC12345"
+
+UPDATE TICKET:
+- action: "update"
+- ticket_id: "TIK-20241201-ABC12345"
+- update_data: '{"status": "in_progress", "assigned_to": "bob@company.com"}'
+
+LIST TICKETS:
+- action: "list"
+- filters: '{"category": "technical", "status": "open"}'
 """
 
 import json
@@ -311,11 +359,19 @@ def lambda_handler(event, context):
         "function": "manageTickets",
         "parameters": [
             {"name": "action", "value": "create|status|update|list"},
-            {"name": "title", "value": "..."},
-            {"name": "description", "value": "..."},
-            ...
+            {"name": "ticket_data", "value": "{\"title\": \"...\", \"description\": \"...\", \"category\": \"...\", \"requester\": \"...\"}"},
+            {"name": "ticket_id", "value": "TIK-YYYYMMDD-XXXXXXXX"},
+            {"name": "update_data", "value": "{\"status\": \"...\", \"assigned_to\": \"...\"}"},
+            {"name": "filters", "value": "{\"category\": \"...\", \"status\": \"...\"}"}
         ]
     }
+    
+    Parameter Examples for Bedrock Agent:
+    - action: "create" (e.g., "create", "status", "update", "list")
+    - ticket_data: '{"title": "API issue", "description": "Rate limiting problem", "category": "technical", "requester": "john@company.com"}' (JSON string for create)
+    - ticket_id: "TIK-20241201-ABC12345" (e.g., existing ticket identifier)
+    - update_data: '{"status": "in_progress", "assigned_to": "bob@company.com"}' (JSON string for updates)
+    - filters: '{"category": "technical", "status": "open"}' (JSON string for filtering)
     """
     logger = get_logger("TicketCreationHandler")
     print(f"DEBUG: Full event received by Lambda: {json.dumps(event, indent=2)}")
@@ -328,17 +384,12 @@ def lambda_handler(event, context):
     try:
         logger.info("Ticket Creation Lambda function invoked", context={"event": event})
         
-        # Extract parameters following Bedrock Agent format
+        # Extract parameters following Bedrock Agent format (consolidated to 5 parameters)
         action = ''
         ticket_id = ''
-        title = ''
-        description = ''
-        category = ''
-        requester = ''
-        priority = 'medium'
-        assigned_to = ''
-        status = ''
-        tags = []
+        ticket_data = {}
+        update_data = {}
+        filters = {}
         
         # 1. Extract parameters from 'parameters' list (Bedrock Agent format)
         if 'parameters' in event and isinstance(event['parameters'], list):
@@ -350,54 +401,53 @@ def lambda_handler(event, context):
                     action = str(param_value).lower()
                 elif param_name == 'ticket_id' and param_value:
                     ticket_id = str(param_value)
-                elif param_name == 'title' and param_value:
-                    title = str(param_value)
-                elif param_name == 'description' and param_value:
-                    description = str(param_value)
-                elif param_name == 'category' and param_value:
-                    category = str(param_value).lower()
-                elif param_name == 'requester' and param_value:
-                    requester = str(param_value)
-                elif param_name == 'priority' and param_value:
-                    priority = str(param_value).lower()
-                elif param_name == 'assigned_to' and param_value:
-                    assigned_to = str(param_value)
-                elif param_name == 'status' and param_value:
-                    status = str(param_value).lower()
-                elif param_name == 'tags' and param_value:
-                    # Handle tags as comma-separated string or list
-                    if isinstance(param_value, str):
-                        tags = [tag.strip() for tag in param_value.split(',') if tag.strip()]
-                    elif isinstance(param_value, list):
-                        tags = param_value
+                elif param_name == 'ticket_data' and param_value:
+                    try:
+                        ticket_data = json.loads(str(param_value))
+                    except json.JSONDecodeError:
+                        ticket_data = {}
+                elif param_name == 'update_data' and param_value:
+                    try:
+                        update_data = json.loads(str(param_value))
+                    except json.JSONDecodeError:
+                        update_data = {}
+                elif param_name == 'filters' and param_value:
+                    try:
+                        filters = json.loads(str(param_value))
+                    except json.JSONDecodeError:
+                        filters = {}
         
         # 2. Fallback to direct key extraction (for testing or other integrations)
         if not action and event.get('action'):
             action = str(event['action']).lower()
         if not ticket_id and event.get('ticket_id'):
             ticket_id = str(event['ticket_id'])
-        if not title and event.get('title'):
-            title = str(event['title'])
-        if not description and event.get('description'):
-            description = str(event['description'])
-        if not category and event.get('category'):
-            category = str(event['category']).lower()
-        if not requester and event.get('requester'):
-            requester = str(event['requester'])
-        if not priority or priority == 'medium':
-            if event.get('priority'):
-                priority = str(event['priority']).lower()
-        if not assigned_to and event.get('assigned_to'):
-            assigned_to = str(event['assigned_to'])
-        if not status and event.get('status'):
-            status = str(event['status']).lower()
-        if not tags and event.get('tags'):
-            if isinstance(event['tags'], str):
-                tags = [tag.strip() for tag in event['tags'].split(',') if tag.strip()]
-            elif isinstance(event['tags'], list):
-                tags = event['tags']
+        if not ticket_data and event.get('ticket_data'):
+            if isinstance(event['ticket_data'], str):
+                try:
+                    ticket_data = json.loads(event['ticket_data'])
+                except json.JSONDecodeError:
+                    ticket_data = {}
+            elif isinstance(event['ticket_data'], dict):
+                ticket_data = event['ticket_data']
+        if not update_data and event.get('update_data'):
+            if isinstance(event['update_data'], str):
+                try:
+                    update_data = json.loads(event['update_data'])
+                except json.JSONDecodeError:
+                    update_data = {}
+            elif isinstance(event['update_data'], dict):
+                update_data = event['update_data']
+        if not filters and event.get('filters'):
+            if isinstance(event['filters'], str):
+                try:
+                    filters = json.loads(event['filters'])
+                except json.JSONDecodeError:
+                    filters = {}
+            elif isinstance(event['filters'], dict):
+                filters = event['filters']
             
-        print(f"DEBUG: Extracted parameters - action: '{action}', ticket_id: '{ticket_id}', title: '{title}'")
+        print(f"DEBUG: Extracted parameters - action: '{action}', ticket_id: '{ticket_id}', ticket_data: {ticket_data}, update_data: {update_data}, filters: {filters}")
         
         request_id = event.get('requestId', f'req-{int(datetime.now().timestamp())}')
         
@@ -434,17 +484,11 @@ def lambda_handler(event, context):
         
         # Route to appropriate action handler
         if action == 'create':
-            # Build ticket data from extracted parameters
-            ticket_data = {
-                'title': title,
-                'description': description,
-                'category': category,
-                'requester': requester,
-                'priority': priority,
-                'assigned_to': assigned_to if assigned_to else None,
-                'tags': tags
-            }
-            result = service.create_ticket(ticket_data)
+            # Use consolidated ticket_data parameter
+            if not ticket_data:
+                result = service._error_response('Missing ticket_data for create action')
+            else:
+                result = service.create_ticket(ticket_data)
             
         elif action == 'status':
             if not ticket_id:
@@ -456,31 +500,14 @@ def lambda_handler(event, context):
             if not ticket_id:
                 result = service._error_response('Missing ticket_id for update action')
             else:
-                # Build updates from extracted parameters
-                updates = {}
-                if status:
-                    updates['status'] = status
-                if priority and priority != 'medium':  # Only include if not default
-                    updates['priority'] = priority
-                if assigned_to:
-                    updates['assigned_to'] = assigned_to
-                if description:
-                    updates['description'] = description
-                if tags:
-                    updates['tags'] = tags
-                    
-                result = service.update_ticket(ticket_id, updates)
+                # Use consolidated update_data parameter
+                if not update_data:
+                    result = service._error_response('Missing update_data for update action')
+                else:
+                    result = service.update_ticket(ticket_id, update_data)
                 
         elif action == 'list':
-            # Build filters from extracted parameters
-            filters = {}
-            if category:
-                filters['category'] = category
-            if status:
-                filters['status'] = status
-            if requester:
-                filters['requester'] = requester
-                
+            # Use consolidated filters parameter
             result = service.list_tickets(filters if filters else None)
             
         else:

@@ -11,7 +11,6 @@ import json
 import time
 import os
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from logger import get_logger
 
@@ -114,7 +113,7 @@ class NewsClient:
             news_articles = self._deduplicate_and_sort(news_articles)
             
             # Limit to most relevant articles
-            news_articles = news_articles[:15]  # Reduced to top 15 most relevant articles
+            news_articles = news_articles[:20]  # Top 20 most relevant articles
             
             # Cache the result
             self._cache_data(cache_key, news_articles)
@@ -128,15 +127,15 @@ class NewsClient:
             return []
     
     def _get_yahoo_finance_news(self, tickers: List[str], timeframe: str) -> List[Dict[str, Any]]:
-        """Get news from Yahoo Finance for each ticker - optimized for fewer articles"""
+        """Get news from Yahoo Finance for each ticker"""
         articles = []
         
-        for ticker in tickers[:4]:  # Limit to 4 tickers to reduce API calls
+        for ticker in tickers:
             try:
                 stock = yf.Ticker(ticker)
                 news = stock.news
                 
-                for item in news[:3]:  # Reduced to top 3 per ticker
+                for item in news[:5]:  # Top 5 per ticker
                     # Convert timestamp to ISO format
                     published_at = datetime.fromtimestamp(
                         item.get('providerPublishTime', time.time())
@@ -160,7 +159,7 @@ class NewsClient:
         return articles
     
     def _get_newsapi_articles(self, tickers: List[str], timeframe: str) -> List[Dict[str, Any]]:
-        """Get news from NewsAPI (requires API key) - optimized for single call"""
+        """Get news from NewsAPI (requires API key)"""
         if not self.newsapi_key:
             return []
         
@@ -171,52 +170,36 @@ class NewsClient:
             days_back = self._timeframe_to_days(timeframe)
             from_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
             
-            # Create a single query for all tickers (more efficient)
-            ticker_queries = []
-            for ticker in tickers[:5]:  # Limit to 5 tickers max
-                company_name = self._get_company_keywords(ticker)
-                ticker_queries.append(f'("{ticker}" OR "{company_name}")')
-            
-            combined_query = ' OR '.join(ticker_queries)
-            
-            url = "https://newsapi.org/v2/everything"
-            params = {
-                'q': combined_query,
-                'from': from_date,
-                'sortBy': 'publishedAt',
-                'language': 'en',
-                'domains': 'reuters.com,bloomberg.com,cnbc.com,marketwatch.com,finance.yahoo.com',
-                'apiKey': self.newsapi_key,
-                'pageSize': 50  # Get more articles in single call
-            }
-            
-            response = requests.get(url, params=params, timeout=15)
-            response.raise_for_status()
-            
-            data = response.json()
-            print("DEBUG: NewsAPI raw response:", data)
-            
-            for item in data.get('articles', []):
-                # Determine which tickers are mentioned in this article
-                title_content = (item.get('title', '') + ' ' + item.get('description', '')).upper()
-                mentioned_tickers = []
-                for ticker in tickers:
-                    if ticker.upper() in title_content or self._get_company_keywords(ticker).upper() in title_content:
-                        mentioned_tickers.append(ticker)
-                
-                if not mentioned_tickers:
-                    mentioned_tickers = tickers[:1]  # Assume first ticker if unclear
-                
-                article = {
-                    'title': item.get('title', ''),
-                    'summary': item.get('description', ''),
-                    'source': item.get('source', {}).get('name', 'NewsAPI'),
-                    'published_at': item.get('publishedAt', ''),
-                    'tickers': mentioned_tickers,
-                    'url': item.get('url', ''),
-                    'relevance_score': 0.7
+            # Search for each ticker
+            for ticker in tickers[:3]:  # Limit to avoid API rate limits
+                url = "https://newsapi.org/v2/everything"
+                params = {
+                    'q': f'"{ticker}" OR "{self._get_company_keywords(ticker)}"',
+                    'from': from_date,
+                    'sortBy': 'publishedAt',
+                    'language': 'en',
+                    'domains': 'reuters.com,bloomberg.com,cnbc.com,marketwatch.com',
+                    'apiKey': self.newsapi_key,
+                    'pageSize': 10
                 }
-                articles.append(article)
+                
+                response = requests.get(url, params=params, timeout=10)
+                response.raise_for_status()
+                
+                data = response.json()
+                print("DEBUG: NewsAPI raw response:", data)
+                
+                for item in data.get('articles', []):
+                    article = {
+                        'title': item.get('title', ''),
+                        'summary': item.get('description', ''),
+                        'source': item.get('source', {}).get('name', 'NewsAPI'),
+                        'published_at': item.get('publishedAt', ''),
+                        'tickers': [ticker],
+                        'url': item.get('url', ''),
+                        'relevance_score': 0.7
+                    }
+                    articles.append(article)
                     
         except Exception as e:
             self.logger.warning("Failed to retrieve NewsAPI articles", error=e)
@@ -335,7 +318,7 @@ class NewsClient:
     
     def get_portfolio_prices(self, tickers: List[str]) -> List[Dict[str, Any]]:
         """
-        Get current price data for portfolio tickers using concurrent processing
+        Get current price data for portfolio tickers
         
         Args:
             tickers: List of stock ticker symbols
@@ -343,7 +326,9 @@ class NewsClient:
         Returns:
             List of price data for each ticker
         """
-        def fetch_single_price(ticker):
+        prices = []
+        
+        for ticker in tickers:
             try:
                 stock = yf.Ticker(ticker)
                 hist = stock.history(period="2d")  # Get last 2 days for change calculation
@@ -354,51 +339,24 @@ class NewsClient:
                     
                     change_percent = ((current_price - previous_price) / previous_price * 100) if previous_price != 0 else 0
                     
-                    return {
+                    price_data = {
                         'ticker': ticker.upper(),
                         'price': round(float(current_price), 2),
                         'change_percent': round(float(change_percent), 2),
                         'timestamp': datetime.now().isoformat() + 'Z'
                     }
-                else:
-                    return {
-                        'ticker': ticker.upper(),
-                        'price': None,
-                        'change_percent': None,
-                        'timestamp': datetime.now().isoformat() + 'Z',
-                        'error': 'No price data available'
-                    }
+                    prices.append(price_data)
                     
             except Exception as e:
                 self.logger.warning(f"Failed to get price data for {ticker}", error=e)
-                return {
+                # Add placeholder data
+                prices.append({
                     'ticker': ticker.upper(),
                     'price': None,
                     'change_percent': None,
                     'timestamp': datetime.now().isoformat() + 'Z',
                     'error': str(e)
-                }
-        
-        prices = []
-        
-        # Use ThreadPoolExecutor for concurrent price fetching
-        with ThreadPoolExecutor(max_workers=min(len(tickers), 5)) as executor:
-            future_to_ticker = {executor.submit(fetch_single_price, ticker): ticker for ticker in tickers}
-            
-            for future in as_completed(future_to_ticker, timeout=30):
-                try:
-                    price_data = future.result()
-                    prices.append(price_data)
-                except Exception as e:
-                    ticker = future_to_ticker[future]
-                    self.logger.warning(f"Failed to get price data for {ticker}", error=e)
-                    prices.append({
-                        'ticker': ticker.upper(),
-                        'price': None,
-                        'change_percent': None,
-                        'timestamp': datetime.now().isoformat() + 'Z',
-                        'error': str(e)
-                    })
+                })
         
         return prices
     

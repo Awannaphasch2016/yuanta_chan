@@ -222,8 +222,8 @@ class ChatbotInfrastructureStack(Stack):
                 )
             ),
             role=self.lambda_execution_role,
-            timeout=Duration.seconds(120),
-            memory_size=1024,
+            timeout=Duration.seconds(30),
+            memory_size=512,
             environment={
                 "LOG_LEVEL": "INFO",
                 "NEWSAPI_KEY": os.getenv("NEWSAPI_KEY", ""),

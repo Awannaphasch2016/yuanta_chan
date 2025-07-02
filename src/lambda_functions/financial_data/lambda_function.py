@@ -18,7 +18,7 @@ class FinancialDataService:
     
     def __init__(self):
         self.logger = get_logger("FinancialDataLambda")
-        self.supported_data_types = ['overview', 'earnings', 'historical', 'profile', 'metrics']
+        self.supported_data_types = ['overview', 'earnings', 'historical', 'profile', 'metrics', 'price']
     
     def get_financial_data(self, ticker: str, data_type: str = 'overview', 
                           additional_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -59,6 +59,8 @@ class FinancialDataService:
                 data = self._get_profile_data(ticker)
             elif data_type == 'metrics':
                 data = self._get_metrics_data(ticker)
+            elif data_type == 'price':
+                data = self._get_price_data(ticker)
             else:
                 return self._error_response(f"Data type handler not implemented: {data_type}")
             
@@ -137,16 +139,33 @@ class FinancialDataService:
             }
     
     def _get_historical_data(self, ticker: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Get historical price data (placeholder for future implementation)"""
-        period = params.get('period', '1y')
-        
-        return {
-            'symbol': ticker,
-            'period': period,
-            'message': 'Historical data retrieval not yet implemented',
-            'placeholder': True,
-            'retrieved_at': datetime.now().isoformat()
-        }
+        """Get historical price data using Yahoo Finance API"""
+        try:
+            period = params.get('period', '1y')
+            start_date = params.get('start_date')
+            end_date = params.get('end_date')
+            
+            # Get historical data from Yahoo Finance
+            historical_data = yahoo_client.get_historical_data(
+                ticker=ticker,
+                period=period,
+                start_date=start_date,
+                end_date=end_date
+            )
+            
+            return historical_data
+            
+        except Exception as e:
+            self.logger.error(f"Historical data retrieval failed for {ticker}", context=None, error=e)
+            return {
+                'symbol': ticker,
+                'period': period,
+                'start_date': start_date,
+                'end_date': end_date,
+                'historical_data': None,
+                'error': str(e),
+                'retrieved_at': datetime.now().isoformat()
+            }
     
     def _get_profile_data(self, ticker: str) -> Dict[str, Any]:
         """Get company profile data"""
@@ -197,6 +216,20 @@ class FinancialDataService:
         }
         
         return metrics
+    
+    def _get_price_data(self, ticker: str) -> Dict[str, Any]:
+        """Get current price data for a ticker"""
+        stock_info = yahoo_client.get_stock_info(ticker)
+        
+        price_data = {
+            'symbol': stock_info.get('symbol'),
+            'name': stock_info.get('name'),
+            'current_price': stock_info.get('currentPrice'),
+            'currency': 'USD',
+            'retrieved_at': stock_info.get('retrieved_at')
+        }
+        
+        return price_data
     
     def _summarize_earnings(self, earnings_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Summarize earnings data for easier consumption"""
@@ -262,8 +295,26 @@ def lambda_handler(event, context):
         if event.get('data_type') is not None:
             data_type = str(event['data_type']).lower()
 
+        # 5. Try to extract 'additional_params' from 'parameters' list (Bedrock Agent format)
+        if 'parameters' in event and isinstance(event['parameters'], list):
+            for param in event['parameters']:
+                if param.get('name') == 'additional_params' and param.get('value') is not None:
+                    # Handle both string and dict formats
+                    if isinstance(param['value'], str):
+                        try:
+                            additional_params = json.loads(param['value'])
+                        except json.JSONDecodeError:
+                            additional_params = {'raw_value': param['value']}
+                    else:
+                        additional_params = param['value']
+                    break
+        
+        # 6. If 'additional_params' is still not found, try to extract from 'additional_params' key directly
+        if additional_params is None and event.get('additional_params') is not None:
+            additional_params = event['additional_params']
 
-        print(f"DEBUG: Ticker: '{ticker}', Data Type: '{data_type}' after extraction.")
+
+        print(f"DEBUG: Ticker: '{ticker}', Data Type: '{data_type}', Additional Params: '{additional_params}' after extraction.")
 
         logger.info(f"🚀 Processing financial data request", 
                    context={
@@ -381,6 +432,13 @@ if __name__ == "__main__":
                     'forwardPE': 25.0, 'returnOnEquity': 1.3, 'debtToEquity': 0.5, 'profitMargins': 0.22,
                     'earningsGrowth': 0.10, 'revenueGrowth': 0.07, 'retrieved_at': datetime.now().isoformat()
                 }
+            elif ticker == "TSLA":
+                return {
+                    'symbol': 'TSLA', 'name': 'Tesla Inc.', 'sector': 'Consumer Cyclical', 'industry': 'Auto Manufacturers',
+                    'marketCap': 800000000000, 'currentPrice': 250.0, 'beta': 2.3, 'dividendYield': 0.0,
+                    'forwardPE': 45.0, 'returnOnEquity': 0.8, 'debtToEquity': 0.3, 'profitMargins': 0.15,
+                    'earningsGrowth': 0.25, 'revenueGrowth': 0.20, 'retrieved_at': datetime.now().isoformat()
+                }
             else:
                 return {} # Or raise an error to simulate validation failure
 
@@ -397,8 +455,125 @@ if __name__ == "__main__":
                 }
             return {}
 
+        def get_historical_data(self, ticker, period='1y', start_date=None, end_date=None):
+            if ticker == "NVDA":
+                # Mock historical data for NVDA
+                return {
+                    'symbol': 'NVDA',
+                    'period': period,
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'historical_data': {
+                        '2025-01-01': {
+                            'open': 450.0,
+                            'high': 455.0,
+                            'low': 448.0,
+                            'close': 452.0,
+                            'volume': 50000000,
+                            'adj_close': 452.0
+                        },
+                        '2025-07-02': {
+                            'open': 1250.0,
+                            'high': 1260.0,
+                            'low': 1240.0,
+                            'close': 1255.0,
+                            'volume': 60000000,
+                            'adj_close': 1255.0
+                        }
+                    },
+                    'summary': {
+                        'current_price': 1255.0,
+                        'start_price': 452.0,
+                        'price_change': 803.0,
+                        'price_change_percent': 177.65,
+                        'highest_price': 1255.0,
+                        'lowest_price': 452.0,
+                        'data_points': 2
+                    },
+                    'retrieved_at': datetime.now().isoformat()
+                }
+            elif ticker == "AAPL":
+                return {
+                    'symbol': 'AAPL',
+                    'period': period,
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'historical_data': {
+                        '2025-01-01': {
+                            'open': 180.0,
+                            'high': 182.0,
+                            'low': 179.0,
+                            'close': 181.0,
+                            'volume': 40000000,
+                            'adj_close': 181.0
+                        },
+                        '2025-07-02': {
+                            'open': 175.0,
+                            'high': 176.0,
+                            'low': 174.0,
+                            'close': 175.0,
+                            'volume': 45000000,
+                            'adj_close': 175.0
+                        }
+                    },
+                    'summary': {
+                        'current_price': 175.0,
+                        'start_price': 181.0,
+                        'price_change': -6.0,
+                        'price_change_percent': -3.31,
+                        'highest_price': 181.0,
+                        'lowest_price': 175.0,
+                        'data_points': 2
+                    },
+                    'retrieved_at': datetime.now().isoformat()
+                }
+            elif ticker == "TSLA":
+                return {
+                    'symbol': 'TSLA',
+                    'period': period,
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'historical_data': {
+                        '2025-01-01': {
+                            'open': 200.0,
+                            'high': 205.0,
+                            'low': 198.0,
+                            'close': 202.0,
+                            'volume': 80000000,
+                            'adj_close': 202.0
+                        },
+                        '2025-07-02': {
+                            'open': 248.0,
+                            'high': 252.0,
+                            'low': 246.0,
+                            'close': 250.0,
+                            'volume': 90000000,
+                            'adj_close': 250.0
+                        }
+                    },
+                    'summary': {
+                        'current_price': 250.0,
+                        'start_price': 202.0,
+                        'price_change': 48.0,
+                        'price_change_percent': 23.76,
+                        'highest_price': 250.0,
+                        'lowest_price': 202.0,
+                        'data_points': 2
+                    },
+                    'retrieved_at': datetime.now().isoformat()
+                }
+            return {
+                'symbol': ticker,
+                'period': period,
+                'start_date': start_date,
+                'end_date': end_date,
+                'historical_data': None,
+                'message': 'No historical data available for the specified period',
+                'retrieved_at': datetime.now().isoformat()
+            }
+
         def validate_ticker(self, ticker):
-            return ticker in ["AAPL", "MSFT", "GOOGL"]
+            return ticker in ["AAPL", "MSFT", "GOOGL", "NVDA", "TSLA"]
 
     # Overwrite the actual yahoo_client with the mock for local testing
     yahoo_client = MockYahooClient() 
@@ -455,6 +630,38 @@ if __name__ == "__main__":
         # Direct Lambda console test style event
         {"ticker": "GOOGL", "data_type": "metrics", "requestId": "test-req-004"},
         {"ticker": "INVALID", "data_type": "overview", "requestId": "test-req-005"},
+        # Historical data test cases
+        {
+            "messageVersion": "1.0",
+            "actionGroup": "FinancialDataActionGroup",
+            "function": "getFinancialData",
+            "parameters": [
+                {"name": "ticker", "value": "NVDA"},
+                {"name": "data_type", "value": "historical"},
+                {"name": "additional_params", "value": {"period": "6mo"}}
+            ],
+            "sessionId": "test-session-hist",
+            "invocationId": "test-invocation-hist",
+            "apiPath": "/",
+            "httpMethod": "POST",
+            "requestId": "test-req-hist"
+        },
+        # TSLA historical data test case
+        {
+            "messageVersion": "1.0",
+            "actionGroup": "FinancialDataActionGroup",
+            "function": "getFinancialData",
+            "parameters": [
+                {"name": "ticker", "value": "TSLA"},
+                {"name": "data_type", "value": "historical"},
+                {"name": "additional_params", "value": {"start_date": "2025-01-01"}}
+            ],
+            "sessionId": "test-session-tsla",
+            "invocationId": "test-invocation-tsla",
+            "apiPath": "/",
+            "httpMethod": "POST",
+            "requestId": "test-req-tsla"
+        },
     ]
     
     for i, test_event in enumerate(test_events_bedrock_format, 1):
