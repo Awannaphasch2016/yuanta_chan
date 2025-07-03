@@ -18,7 +18,8 @@ class FinancialDataService:
     
     def __init__(self):
         self.logger = get_logger("FinancialDataLambda")
-        self.supported_data_types = ['overview', 'earnings', 'historical', 'profile', 'metrics', 'price']
+        self.supported_data_types = ['overview', 'earnings', 'latesearnings', 'historical', 'profile', 'metrics', 'price']
+        self.supported_query_types = ['latestEarnings']  # PRD queryType values
     
     def get_financial_data(self, ticker: str, data_type: str = 'overview', 
                           additional_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -53,6 +54,8 @@ class FinancialDataService:
                 data = self._get_overview_data(ticker)
             elif data_type == 'earnings':
                 data = self._get_earnings_data(ticker)
+            elif data_type == 'latesearnings':
+                data = self._get_latest_earnings_data(ticker)
             elif data_type == 'historical':
                 data = self._get_historical_data(ticker, additional_params or {})
             elif data_type == 'profile':
@@ -135,6 +138,23 @@ class FinancialDataService:
                 'symbol': ticker,
                 'earnings_available': False,
                 'error': str(e),
+                'retrieved_at': datetime.now().isoformat()
+            }
+    
+    def _get_latest_earnings_data(self, ticker: str) -> Dict[str, Any]:
+        """Get latest quarterly earnings data in PRD format"""
+        try:
+            # Use the new quarterly earnings method
+            quarterly_data = yahoo_client.get_quarterly_earnings(ticker)
+            
+            self.logger.info(f"Successfully retrieved latest earnings for {ticker}")
+            return quarterly_data
+            
+        except Exception as e:
+            self.logger.error(f"Latest earnings data retrieval failed for {ticker}", context=None, error=e)
+            return {
+                'ticker': ticker,
+                'error': f"Unable to retrieve latest earnings: {str(e)}",
                 'retrieved_at': datetime.now().isoformat()
             }
     
@@ -270,6 +290,7 @@ def lambda_handler(event, context):
     try:
         ticker = ''
         data_type = event.get('data_type', 'overview')
+        query_type = event.get('queryType', '')  # PRD parameter
         additional_params = event.get('additional_params')
         request_id = event.get('requestId', f'req-{int(time.time())}')
 
@@ -284,18 +305,35 @@ def lambda_handler(event, context):
         if not ticker and event.get('ticker') is not None:
             ticker = str(event['ticker']).upper()
 
-        # 3. Try to extract 'data_type' from 'parameters' list (Bedrock Agent format)
+        # 3. Try to extract 'queryType' from 'parameters' list (Bedrock Agent format) - PRD parameter
+        if 'parameters' in event and isinstance(event['parameters'], list):
+            for param in event['parameters']:
+                if param.get('name') == 'queryType' and param.get('value') is not None:
+                    query_type = str(param['value']).lower()
+                    break
+
+        # 4. If 'queryType' is still not found, try to extract from 'queryType' key directly
+        if not query_type and event.get('queryType') is not None:
+            query_type = str(event['queryType']).lower()
+
+        # 5. Try to extract 'data_type' from 'parameters' list (Bedrock Agent format)
         if 'parameters' in event and isinstance(event['parameters'], list):
             for param in event['parameters']:
                 if param.get('name') == 'data_type' and param.get('value') is not None:
                     data_type = str(param['value']).lower()
                     break
         
-        # 4. If 'data_type' is still not found, try to extract from 'data_type' key directly
+        # 6. If 'data_type' is still not found, try to extract from 'data_type' key directly
         if event.get('data_type') is not None:
             data_type = str(event['data_type']).lower()
 
-        # 5. Try to extract 'additional_params' from 'parameters' list (Bedrock Agent format)
+        # 7. Map queryType to data_type for PRD compliance
+        if query_type == 'latestearnings':
+            data_type = 'latesearnings'
+        elif query_type and not data_type:
+            data_type = query_type
+
+        # 8. Try to extract 'additional_params' from 'parameters' list (Bedrock Agent format)
         if 'parameters' in event and isinstance(event['parameters'], list):
             for param in event['parameters']:
                 if param.get('name') == 'additional_params' and param.get('value') is not None:
@@ -309,18 +347,19 @@ def lambda_handler(event, context):
                         additional_params = param['value']
                     break
         
-        # 6. If 'additional_params' is still not found, try to extract from 'additional_params' key directly
+        # 9. If 'additional_params' is still not found, try to extract from 'additional_params' key directly
         if additional_params is None and event.get('additional_params') is not None:
             additional_params = event['additional_params']
 
 
-        print(f"DEBUG: Ticker: '{ticker}', Data Type: '{data_type}', Additional Params: '{additional_params}' after extraction.")
+        print(f"DEBUG: Ticker: '{ticker}', Data Type: '{data_type}', Query Type: '{query_type}', Additional Params: '{additional_params}' after extraction.")
 
         logger.info(f"🚀 Processing financial data request", 
                    context={
                        'requestId': request_id, 
                        'ticker': ticker, 
-                       'data_type': data_type
+                       'data_type': data_type,
+                       'query_type': query_type
                    })
         
         # Handle cases where 'ticker' is still missing
@@ -454,6 +493,47 @@ if __name__ == "__main__":
                     'retrieved_at': datetime.now().isoformat()
                 }
             return {}
+
+        def get_quarterly_earnings(self, ticker):
+            # Mock quarterly earnings data in PRD format
+            if ticker == "AAPL":
+                return {
+                    'ticker': 'AAPL',
+                    'quarter': 'Q1 2025',
+                    'reportDate': '2025-01-30',
+                    'revenue': 119580000000,  # $119.58B
+                    'netIncome': 30687000000,  # $30.69B
+                    'EPS': 1.88,
+                    'currency': 'USD',
+                    'yearAgoRevenue': 117154000000,  # $117.15B
+                    'yearAgoEPS': 1.76,
+                    'retrieved_at': datetime.now().isoformat()
+                }
+            elif ticker == "TSLA":
+                return {
+                    'ticker': 'TSLA',
+                    'quarter': 'Q1 2025',
+                    'reportDate': '2025-01-24',
+                    'revenue': 25167000000,  # $25.17B
+                    'netIncome': 2513000000,  # $2.51B
+                    'EPS': 0.71,
+                    'currency': 'USD',
+                    'yearAgoRevenue': 23329000000,  # $23.33B
+                    'yearAgoEPS': 0.64,
+                    'retrieved_at': datetime.now().isoformat()
+                }
+            return {
+                'ticker': ticker,
+                'quarter': 'Q1 2025',
+                'reportDate': '2025-01-30',
+                'revenue': 10000000000,  # $10B default
+                'netIncome': 1000000000,  # $1B default
+                'EPS': 1.25,
+                'currency': 'USD',
+                'yearAgoRevenue': 9500000000,  # $9.5B default
+                'yearAgoEPS': 1.18,
+                'retrieved_at': datetime.now().isoformat()
+            }
 
         def get_historical_data(self, ticker, period='1y', start_date=None, end_date=None):
             if ticker == "NVDA":
@@ -607,22 +687,23 @@ if __name__ == "__main__":
                 {"name": "ticker", "value": "MSFT"},
                 {"name": "data_type", "value": "earnings"}
             ],
-            "sessionId": "test-session-456",
-            "invocationId": "test-invocation-456",
+            "sessionId": "test-session-124",
+            "invocationId": "test-invocation-124",
             "apiPath": "/",
             "httpMethod": "POST",
             "requestId": "test-req-002"
         },
-        # Bedrock Agent style event for missing ticker
+        # PRD format - Latest Earnings with queryType
         {
             "messageVersion": "1.0",
             "actionGroup": "FinancialDataActionGroup",
             "function": "getFinancialData",
             "parameters": [
-                {"name": "data_type", "value": "profile"} # Missing ticker here
+                {"name": "ticker", "value": "TSLA"},
+                {"name": "queryType", "value": "latestEarnings"}
             ],
-            "sessionId": "test-session-789",
-            "invocationId": "test-invocation-789",
+            "sessionId": "test-session-125",
+            "invocationId": "test-invocation-125",
             "apiPath": "/",
             "httpMethod": "POST",
             "requestId": "test-req-003"

@@ -83,7 +83,7 @@ def main():
         sys.exit(1)
 
     agent_id = '52MGYIUNTN'
-    alias_id = 'XJUR3G7LY5'
+    alias_id = 'RCWRQH8VRS'
 
     # Decide whether to run interactive chat or single message
     if args.input and not args.interactive:

@@ -120,3 +120,5 @@ DEPENDENCY_FIX_SUMMARY.md
 # MCP/AI/agent files
 .cursor/
 
+web_ui/
+real_data/
