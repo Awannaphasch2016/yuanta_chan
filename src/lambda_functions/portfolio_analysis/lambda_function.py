@@ -25,6 +25,7 @@ from typing import Dict, Any, Optional, List
 from decimal import Decimal
 import uuid
 import logging
+import csv
 
 from logger import get_logger
 from yahoo_finance_client import yahoo_client
@@ -61,14 +62,14 @@ class PortfolioAnalysisService:
         # Mock portfolio data for demonstration
         self.mock_portfolios = self._initialize_mock_data()
     
-    def analyze_portfolio(self, analysis_type: str, client_name: str = None, 
+    def analyze_portfolio(self, analysis_type: str, user_id: str = None, 
                          employee_name: str = None, additional_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Perform comprehensive portfolio analysis based on query type
         
         Args:
             analysis_type: Type of analysis to perform
-            client_name: Client name for client-specific queries
+            user_id: User ID for user-specific queries
             employee_name: Employee name for employee-specific queries
             additional_params: Additional parameters for specific analysis types
             
@@ -76,7 +77,7 @@ class PortfolioAnalysisService:
             Comprehensive analysis results with insights and recommendations
         """
         self.start_time = time.time()
-        self.logger.info(f"🚀 Starting portfolio analysis: {analysis_type} for client: {client_name}")
+        self.logger.info(f"🚀 Starting portfolio analysis: {analysis_type} for user_id: {user_id}")
         
         try:
             # Validate inputs
@@ -85,25 +86,35 @@ class PortfolioAnalysisService:
             
             # Route to appropriate analysis method
             if analysis_type == 'overview':
-                result = self._analyze_portfolio_overview(client_name, additional_params or {})
+                result = self._analyze_portfolio_overview(user_id, additional_params or {})
             elif analysis_type == 'performance':
-                result = self._analyze_performance_report(client_name, additional_params or {})
+                result = self._analyze_performance_report(user_id, additional_params or {})
             elif analysis_type == 'holdings':
-                result = self._analyze_holdings(client_name, additional_params or {})
+                result = self._analyze_holdings(user_id, additional_params or {})
             elif analysis_type == 'transactions':
-                result = self._analyze_transactions(client_name, additional_params or {})
+                result = self._analyze_transactions(user_id, additional_params or {})
             elif analysis_type == 'risk':
-                result = self._analyze_risk_metrics(client_name, additional_params or {})
+                result = self._analyze_risk_metrics(user_id, additional_params or {})
             elif analysis_type == 'comparison':
                 result = self._analyze_comparative_performance(additional_params or {})
             elif analysis_type == 'sector_breakdown':
-                result = self._analyze_sector_breakdown(client_name, additional_params or {})
+                result = self._analyze_sector_breakdown(user_id, additional_params or {})
             elif analysis_type == 'alerts':
                 result = self._analyze_alerts_notifications(additional_params or {})
             elif analysis_type == 'personal_portfolio':
-                result = self._analyze_personal_portfolio(employee_name, additional_params or {})
+                result = self._analyze_personal_portfolio(user_id, additional_params or {})
             elif analysis_type == 'compliance':
                 result = self._analyze_compliance_audit(additional_params or {})
+            elif analysis_type == 'user_portfolio':
+                if not user_id:
+                    return self._error_response("Missing required parameter 'user_id' for user_portfolio analysis_type")
+                holdings = self.get_user_portfolio_from_csv(user_id)
+                return {
+                    'user_id': user_id,
+                    'analysis_type': 'user_portfolio',
+                    'holdings': holdings,
+                    'success': True
+                }
             else:
                 return self._error_response(f"Analysis handler not implemented: {analysis_type}")
             
@@ -122,85 +133,54 @@ class PortfolioAnalysisService:
             self.logger.error(f"❌ Portfolio analysis failed: {analysis_type}", error=e)
             return self._error_response(f"Analysis failed: {str(e)}")
     
-    def _analyze_portfolio_overview(self, client_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _analyze_portfolio_overview(self, user_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Analyze client portfolio overview
-        Handles queries like: "Show me an overview of [client name]'s portfolio"
+        Analyze client portfolio overview using real data from customer_database.csv
         """
-        self.logger.info(f"📊 Generating portfolio overview for {client_name}")
-        
+        self.logger.info(f"📊 Generating portfolio overview for {user_id} (real data)")
         try:
-            # Get client portfolio data
-            portfolio_data = self._get_client_portfolio(client_name)
+            portfolio_data = self._get_client_portfolio(user_id)
             if not portfolio_data:
-                return self._error_response(f"No portfolio found for client: {client_name}")
-            
-            # Calculate overview metrics
-            total_value = sum(holding['market_value'] for holding in portfolio_data['holdings'])
-            total_gain_loss = sum(holding['unrealized_gain_loss'] for holding in portfolio_data['holdings'])
-            total_return_pct = (total_gain_loss / (total_value - total_gain_loss)) * 100 if total_value > total_gain_loss else 0
-            
-            # Get top holdings
-            top_holdings = sorted(portfolio_data['holdings'], 
-                                key=lambda x: x['market_value'], reverse=True)[:5]
-            
-            # Sector allocation
-            sector_allocation = self._calculate_sector_allocation(portfolio_data['holdings'])
-            
+                return self._error_response(f"No portfolio found for user_id: {user_id}")
+            holdings = portfolio_data['holdings']
+            total_value = sum(h['QuotedValue'] for h in holdings)
+            num_holdings = len(holdings)
+            # Top holdings by QuotedValue
+            top_holdings = sorted(holdings, key=lambda x: x['QuotedValue'], reverse=True)[:5]
             overview = {
-                'client_name': client_name,
+                'user_id': user_id,
                 'analysis_type': 'portfolio_overview',
                 'summary': {
                     'total_portfolio_value': total_value,
-                    'total_gain_loss': total_gain_loss,
-                    'total_return_percentage': round(total_return_pct, 2),
-                    'number_of_holdings': len(portfolio_data['holdings']),
-                    'last_updated': portfolio_data.get('last_updated', datetime.now().isoformat())
+                    'number_of_holdings': num_holdings,
+                    'last_updated': portfolio_data.get('last_updated')
                 },
-                'top_holdings': [
-                    {
-                        'symbol': holding['symbol'],
-                        'name': holding['name'],
-                        'market_value': holding['market_value'],
-                        'weight_percentage': round((holding['market_value'] / total_value) * 100, 2),
-                        'gain_loss': holding['unrealized_gain_loss']
-                    }
-                    for holding in top_holdings
-                ],
-                'sector_allocation': sector_allocation,
-                'risk_metrics': {
-                    'portfolio_beta': portfolio_data.get('portfolio_beta', 1.0),
-                    'sharpe_ratio': portfolio_data.get('sharpe_ratio', 0.8),
-                    'volatility': portfolio_data.get('volatility', 0.15)
-                },
-                'insights': self._generate_portfolio_insights(portfolio_data, total_return_pct),
+                'top_holdings': top_holdings,
                 'success': True
             }
-            
             return overview
-            
         except Exception as e:
-            self.logger.error(f"Portfolio overview analysis failed for {client_name}", error=e)
+            self.logger.error(f"Portfolio overview analysis failed for {user_id}", error=e)
             return self._error_response(f"Overview analysis failed: {str(e)}")
     
-    def _analyze_performance_report(self, client_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _analyze_performance_report(self, user_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate performance reports (monthly/quarterly/annual)
-        Handles queries like: "Generate the monthly report for [client name]"
+        Handles queries like: "Generate the monthly report for [user_id]"
         """
         period = params.get('period', 'monthly')  # monthly, quarterly, annual
-        self.logger.info(f"📈 Generating {period} performance report for {client_name}")
+        self.logger.info(f"📈 Generating {period} performance report for {user_id}")
         
         try:
-            portfolio_data = self._get_client_portfolio(client_name)
+            portfolio_data = self._get_client_portfolio(user_id)
             if not portfolio_data:
-                return self._error_response(f"No portfolio found for client: {client_name}")
+                return self._error_response(f"No portfolio found for user_id: {user_id}")
             
             # Calculate performance metrics for the period
             performance_data = self._calculate_performance_metrics(portfolio_data, period)
             
             report = {
-                'client_name': client_name,
+                'user_id': user_id,
                 'analysis_type': 'performance_report',
                 'report_period': period,
                 'performance_summary': {
@@ -227,24 +207,24 @@ class PortfolioAnalysisService:
             return report
             
         except Exception as e:
-            self.logger.error(f"Performance report failed for {client_name}", error=e)
+            self.logger.error(f"Performance report failed for {user_id}", error=e)
             return self._error_response(f"Performance report failed: {str(e)}")
     
-    def _analyze_risk_metrics(self, client_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _analyze_risk_metrics(self, user_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Analyze risk metrics (volatility, drawdown, Sharpe ratio)
-        Handles queries like: "Show risk metrics for [client name]'s portfolio"
+        Handles queries like: "Show risk metrics for [user_id]'s portfolio"
         """
-        self.logger.info(f"⚠️ Analyzing risk metrics for {client_name}")
+        self.logger.info(f"⚠️ Analyzing risk metrics for {user_id}")
         
         try:
-            portfolio_data = self._get_client_portfolio(client_name)
+            portfolio_data = self._get_client_portfolio(user_id)
             if not portfolio_data:
-                return self._error_response(f"No portfolio found for client: {client_name}")
+                return self._error_response(f"No portfolio found for user_id: {user_id}")
             
             # Calculate comprehensive risk metrics
             risk_analysis = {
-                'client_name': client_name,
+                'user_id': user_id,
                 'analysis_type': 'risk_analysis',
                 'risk_metrics': {
                     'portfolio_beta': portfolio_data.get('portfolio_beta', 1.0),
@@ -268,44 +248,44 @@ class PortfolioAnalysisService:
             return risk_analysis
             
         except Exception as e:
-            self.logger.error(f"Risk analysis failed for {client_name}", error=e)
+            self.logger.error(f"Risk analysis failed for {user_id}", error=e)
             return self._error_response(f"Risk analysis failed: {str(e)}")
     
     def _analyze_comparative_performance(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Compare performance between clients or against benchmarks
-        Handles queries like: "Compare performance between [client1] and [client2]"
+        Handles queries like: "Compare performance between [user_id1] and [user_id2]"
         """
-        client1 = params.get('client1')
-        client2 = params.get('client2')
+        user_id1 = params.get('user_id1')
+        user_id2 = params.get('user_id2')
         
-        self.logger.info(f"📊 Comparing performance: {client1} vs {client2}")
+        self.logger.info(f"📊 Comparing performance: {user_id1} vs {user_id2}")
         
         try:
-            portfolio1 = self._get_client_portfolio(client1)
-            portfolio2 = self._get_client_portfolio(client2)
+            portfolio1 = self._get_client_portfolio(user_id1)
+            portfolio2 = self._get_client_portfolio(user_id2)
             
             if not portfolio1 or not portfolio2:
                 return self._error_response("One or both client portfolios not found")
             
             comparison = {
                 'analysis_type': 'comparative_analysis',
-                'clients_compared': [client1, client2],
+                'clients_compared': [user_id1, user_id2],
                 'performance_comparison': {
-                    client1: {
+                    user_id1: {
                         'total_return': portfolio1.get('total_return', 0.12),
                         'sharpe_ratio': portfolio1.get('sharpe_ratio', 0.8),
                         'volatility': portfolio1.get('volatility', 0.15),
                         'max_drawdown': portfolio1.get('max_drawdown', -0.08)
                     },
-                    client2: {
+                    user_id2: {
                         'total_return': portfolio2.get('total_return', 0.10),
                         'sharpe_ratio': portfolio2.get('sharpe_ratio', 0.9),
                         'volatility': portfolio2.get('volatility', 0.12),
                         'max_drawdown': portfolio2.get('max_drawdown', -0.06)
                     }
                 },
-                'winner_analysis': self._determine_performance_winner(portfolio1, portfolio2, client1, client2),
+                'winner_analysis': self._determine_performance_winner(portfolio1, portfolio2, user_id1, user_id2),
                 'key_differences': self._identify_portfolio_differences(portfolio1, portfolio2),
                 'success': True
             }
@@ -316,20 +296,20 @@ class PortfolioAnalysisService:
             self.logger.error(f"Comparative analysis failed", error=e)
             return self._error_response(f"Comparative analysis failed: {str(e)}")
     
-    def _analyze_sector_breakdown(self, client_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _analyze_sector_breakdown(self, user_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Analyze sector allocation and performance
-        Handles queries like: "Show sector allocation for [client name]'s portfolio"
+        Handles queries like: "Show sector allocation for [user_id]'s portfolio"
         """
-        self.logger.info(f"🏭 Analyzing sector breakdown for {client_name}")
+        self.logger.info(f"🏭 Analyzing sector breakdown for {user_id}")
         
         try:
-            portfolio_data = self._get_client_portfolio(client_name)
+            portfolio_data = self._get_client_portfolio(user_id)
             if not portfolio_data:
-                return self._error_response(f"No portfolio found for client: {client_name}")
+                return self._error_response(f"No portfolio found for user_id: {user_id}")
             
             sector_analysis = {
-                'client_name': client_name,
+                'user_id': user_id,
                 'analysis_type': 'sector_breakdown',
                 'sector_allocation': self._calculate_sector_allocation(portfolio_data['holdings']),
                 'sector_performance': self._calculate_sector_performance(portfolio_data['holdings']),
@@ -345,7 +325,7 @@ class PortfolioAnalysisService:
             return sector_analysis
             
         except Exception as e:
-            self.logger.error(f"Sector analysis failed for {client_name}", error=e)
+            self.logger.error(f"Sector analysis failed for {user_id}", error=e)
             return self._error_response(f"Sector analysis failed: {str(e)}")
     
     def _analyze_alerts_notifications(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -370,12 +350,12 @@ class PortfolioAnalysisService:
             }
             
             # Check all mock portfolios for alerts
-            for client_name, portfolio in self.mock_portfolios.items():
+            for user_id, portfolio in self.mock_portfolios.items():
                 # Portfolio value change alerts
                 recent_change = portfolio.get('recent_change_pct', 0)
                 if abs(recent_change) > threshold:
                     alerts['portfolio_alerts'].append({
-                        'client': client_name,
+                        'user_id': user_id,
                         'alert_type': 'significant_change',
                         'change_percentage': recent_change,
                         'message': f"Portfolio changed by {recent_change:.2f}% recently"
@@ -384,7 +364,7 @@ class PortfolioAnalysisService:
                 # Rebalancing alerts
                 if self._needs_rebalancing(portfolio):
                     alerts['rebalancing_needed'].append({
-                        'client': client_name,
+                        'user_id': user_id,
                         'reason': 'Asset allocation drift detected',
                         'priority': 'medium'
                     })
@@ -392,7 +372,7 @@ class PortfolioAnalysisService:
                 # Risk alerts
                 if portfolio.get('portfolio_beta', 1.0) > 1.5:
                     alerts['risk_alerts'].append({
-                        'client': client_name,
+                        'user_id': user_id,
                         'alert_type': 'high_beta',
                         'beta_value': portfolio.get('portfolio_beta', 1.0),
                         'message': 'Portfolio beta exceeds risk tolerance'
@@ -404,50 +384,25 @@ class PortfolioAnalysisService:
             self.logger.error(f"Alerts analysis failed", error=e)
             return self._error_response(f"Alerts analysis failed: {str(e)}")
     
-    def _analyze_personal_portfolio(self, employee_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _analyze_personal_portfolio(self, user_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Analyze employee's personal portfolio
-        Handles queries like: "Show my own portfolio performance for the last 6 months"
+        Query customer_database.csv for the user's holdings and return Instrument, Amount, Price, QuotedValue.
         """
-        period = params.get('period', '6_months')
-        
-        self.logger.info(f"👤 Analyzing personal portfolio for {employee_name}")
-        
+        self.logger.info(f"🔍 Querying personal portfolio for {user_id} (real data)")
         try:
-            # Mock personal portfolio data
-            personal_portfolio = {
-                'employee_name': employee_name,
+            portfolio_data = self._get_client_portfolio(user_id)
+            if not portfolio_data:
+                return self._error_response(f"No portfolio found for user_id: {user_id}")
+            holdings = portfolio_data['holdings']
+            return {
+                'user_id': user_id,
                 'analysis_type': 'personal_portfolio',
-                'portfolio_summary': {
-                    'total_value': 150000,
-                    'total_return': 0.08,
-                    'period_analyzed': period,
-                    'last_updated': datetime.now().isoformat()
-                },
-                'top_holdings': [
-                    {'symbol': 'AAPL', 'value': 25000, 'weight': 16.7},
-                    {'symbol': 'MSFT', 'value': 20000, 'weight': 13.3},
-                    {'symbol': 'GOOGL', 'value': 18000, 'weight': 12.0}
-                ],
-                'performance_metrics': {
-                    'period_return': 0.08,
-                    'sharpe_ratio': 1.1,
-                    'volatility': 0.14,
-                    'max_drawdown': -0.06
-                },
-                'insights': [
-                    f"Portfolio has generated 8% return over {period}",
-                    "Sharpe ratio of 1.1 indicates good risk-adjusted returns",
-                    "Technology allocation may be overweight"
-                ],
+                'holdings': holdings,
                 'success': True
             }
-            
-            return personal_portfolio
-            
         except Exception as e:
-            self.logger.error(f"Personal portfolio analysis failed for {employee_name}", error=e)
-            return self._error_response(f"Personal portfolio analysis failed: {str(e)}")
+            self.logger.error(f"Personal portfolio query failed for {user_id}", error=e)
+            return self._error_response(f"Personal portfolio query failed: {str(e)}")
     
     def _analyze_compliance_audit(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -464,7 +419,7 @@ class PortfolioAnalysisService:
                 'audit_period': period,
                 'unusual_transactions': [
                     {
-                        'client': 'John Smith',
+                        'user_id': 'John Smith',
                         'transaction_type': 'large_sale',
                         'amount': 500000,
                         'symbol': 'AAPL',
@@ -474,7 +429,7 @@ class PortfolioAnalysisService:
                 ],
                 'compliance_alerts': [
                     {
-                        'client': 'Sarah Johnson',
+                        'user_id': 'Sarah Johnson',
                         'alert_type': 'concentration_risk',
                         'description': 'Single position exceeds 15% of portfolio'
                     }
@@ -500,9 +455,34 @@ class PortfolioAnalysisService:
     
     # Helper methods for calculations and data processing
     
-    def _get_client_portfolio(self, client_name: str) -> Optional[Dict[str, Any]]:
-        """Get portfolio data for a specific client"""
-        return self.mock_portfolios.get(client_name)
+    def _get_client_portfolio(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get portfolio data for a specific user_id from customer_database.csv.
+        Returns a dict with 'holdings' (list of holdings) and summary info.
+        """
+        csv_path = os.path.join(os.path.dirname(__file__), 'database', 'customer_database.csv')
+        holdings = []
+        try:
+            with open(csv_path, newline='', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    if str(row['user_id']).strip() == str(user_id).strip():
+                        holdings.append({
+                            'Instrument': row['Instrument'].strip(),
+                            'Amount': float(row['Amount']),
+                            'Price': float(row['Price']),
+                            'QuotedValue': float(row['QuotedValue'])
+                        })
+            if not holdings:
+                return None
+            return {
+                'user_id': user_id,
+                'holdings': holdings,
+                'last_updated': holdings[0].get('ReportingDate', None) if holdings else None
+            }
+        except Exception as e:
+            self.logger.error(f"Error reading customer_database.csv for user_id {user_id}", error=e)
+            return None
     
     def _calculate_sector_allocation(self, holdings: List[Dict[str, Any]]) -> Dict[str, float]:
         """Calculate sector allocation percentages"""
@@ -552,7 +532,7 @@ class PortfolioAnalysisService:
         """Initialize mock portfolio data for demonstration"""
         return {
             'John Smith': {
-                'client_id': 'CLI001',
+                'user_id': 'CLI001',
                 'total_value': 250000,
                 'portfolio_beta': 1.1,
                 'sharpe_ratio': 0.85,
@@ -589,7 +569,7 @@ class PortfolioAnalysisService:
                 'last_updated': datetime.now().isoformat()
             },
             'Sarah Johnson': {
-                'client_id': 'CLI002',
+                'user_id': 'CLI002',
                 'total_value': 180000,
                 'portfolio_beta': 0.9,
                 'sharpe_ratio': 1.1,
@@ -677,12 +657,12 @@ class PortfolioAnalysisService:
         ]
     
     def _determine_performance_winner(self, portfolio1: Dict, portfolio2: Dict, 
-                                    client1: str, client2: str) -> Dict[str, Any]:
+                                    user_id1: str, user_id2: str) -> Dict[str, Any]:
         """Determine which portfolio performed better"""
         return1 = portfolio1.get('total_return', 0)
         return2 = portfolio2.get('total_return', 0)
         
-        winner = client1 if return1 > return2 else client2
+        winner = user_id1 if return1 > return2 else user_id2
         return {
             'winner': winner,
             'margin': abs(return1 - return2),
@@ -704,6 +684,29 @@ class PortfolioAnalysisService:
             "Consider taking profits on best performers",
             "Monitor market conditions for rebalancing opportunities"
         ]
+
+    def get_user_portfolio_from_csv(self, user_id: str) -> List[Dict[str, Any]]:
+        """
+        Query customer_database.csv for all holdings of a given user_id.
+        Returns a list of dicts with Instrument, Amount, Price, QuotedValue.
+        """
+        csv_path = os.path.join(os.path.dirname(__file__), 'database', 'customer_database.csv')
+        results = []
+        try:
+            with open(csv_path, newline='', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    if str(row['user_id']).strip() == str(user_id).strip():
+                        results.append({
+                            'Instrument': row['Instrument'].strip(),
+                            'Amount': float(row['Amount']),
+                            'Price': float(row['Price']),
+                            'QuotedValue': float(row['QuotedValue'])
+                        })
+            return results
+        except Exception as e:
+            self.logger.error(f"Error reading customer_database.csv for user_id {user_id}", error=e)
+            return []
 
 
 def extract_param(param):
@@ -727,7 +730,7 @@ def lambda_handler(event, context):
 
     try:
         analysis_type = 'overview'  # Default analysis type
-        client_name = None
+        user_id = None
         employee_name = None
         additional_params = {}
         request_id = event.get('requestId', f'req-{int(time.time())}')
@@ -743,16 +746,16 @@ def lambda_handler(event, context):
         if event.get('analysis_type') is not None:
             analysis_type = str(event['analysis_type']).lower().strip()
 
-        # 3. Try to extract 'client_name' from 'parameters' list (Bedrock Agent format)
+        # 3. Try to extract 'user_id' from 'parameters' list (Bedrock Agent format)
         if 'parameters' in event and isinstance(event['parameters'], list):
             for param in event['parameters']:
-                if param.get('name') == 'client_name' and param.get('value') is not None:
-                    client_name = str(param['value']).strip()
+                if param.get('name') == 'user_id' and param.get('value') is not None:
+                    user_id = str(param['value']).strip()
                     break
         
-        # 4. If 'client_name' is still not found, try to extract from direct key
-        if event.get('client_name') is not None:
-            client_name = str(event['client_name']).strip()
+        # 4. If 'user_id' is still not found, try to extract from direct key
+        if event.get('user_id') is not None:
+            user_id = str(event['user_id']).strip()
 
         # 5. Try to extract 'employee_name' from 'parameters' list (Bedrock Agent format)
         if 'parameters' in event and isinstance(event['parameters'], list):
@@ -772,7 +775,7 @@ def lambda_handler(event, context):
                 param_value = param.get('value')
                 
                 if param_name and param_value is not None:
-                    if param_name in ['period', 'client1', 'client2', 'threshold']:
+                    if param_name in ['period', 'user_id1', 'user_id2', 'threshold']:
                         additional_params[param_name] = param_value
                     elif param_name == 'threshold':
                         # Convert threshold to float if it's a number
@@ -785,24 +788,24 @@ def lambda_handler(event, context):
         if event.get('additional_params') is not None:
             additional_params.update(event['additional_params'])
 
-        print(f"DEBUG: Analysis Type: '{analysis_type}', Client: '{client_name}', Employee: '{employee_name}', Additional Params: {additional_params}")
+        print(f"DEBUG: Analysis Type: '{analysis_type}', User_id: '{user_id}', Employee: '{employee_name}', Additional Params: {additional_params}")
 
         logger.info(f"🚀 Processing portfolio analysis request", 
                    context={
                        'requestId': request_id, 
                        'analysis_type': analysis_type, 
-                       'client_name': client_name,
+                       'user_id': user_id,
                        'employee_name': employee_name
                    })
         
         # Initialize service
         service = PortfolioAnalysisService()
         
-        # Simple validation: client_name required for most analysis types
+        # Simple validation: user_id required for most analysis types
         client_required_types = ['overview', 'performance', 'holdings', 'transactions', 'risk', 'sector_breakdown']
         
-        if analysis_type in client_required_types and not client_name:
-            error_msg = f"Missing required parameter 'client_name' for analysis_type '{analysis_type}'"
+        if analysis_type in client_required_types and not user_id:
+            error_msg = f"Missing required parameter 'user_id' for analysis_type '{analysis_type}'"
             logger.error(f"LAMBDA ERROR: {error_msg}")
             
             error_response = {
@@ -831,7 +834,7 @@ def lambda_handler(event, context):
         # Perform analysis
         result = service.analyze_portfolio(
             analysis_type=analysis_type,
-            client_name=client_name,
+            user_id=user_id,
             employee_name=employee_name,
             additional_params=additional_params
         )
@@ -930,7 +933,7 @@ if __name__ == "__main__":
             "function": "analyzePortfolio",
             "parameters": [
                 {"name": "analysis_type", "value": "overview"},
-                {"name": "client_name", "value": "John Smith"}
+                {"name": "user_id", "value": "CLI001"}
             ],
             "sessionId": "test-session-123",
             "invocationId": "test-invocation-123",
@@ -945,7 +948,7 @@ if __name__ == "__main__":
             "function": "analyzePortfolio",
             "parameters": [
                 {"name": "analysis_type", "value": "performance"},
-                {"name": "client_name", "value": "Sarah Johnson"},
+                {"name": "user_id", "value": "CLI002"},
                 {"name": "period", "value": "monthly"}
             ],
             "sessionId": "test-session-456",
@@ -961,7 +964,7 @@ if __name__ == "__main__":
             "function": "analyzePortfolio",
             "parameters": [
                 {"name": "analysis_type", "value": "risk"},
-                {"name": "client_name", "value": "John Smith"}
+                {"name": "user_id", "value": "CLI001"}
             ],
             "sessionId": "test-session-789",
             "invocationId": "test-invocation-789",
@@ -970,8 +973,8 @@ if __name__ == "__main__":
             "requestId": "test-req-003"
         },
         # Direct Lambda console test style event
-        {"analysis_type": "overview", "client_name": "John Smith", "requestId": "test-req-004"},
-        {"analysis_type": "sector_breakdown", "client_name": "Sarah Johnson", "requestId": "test-req-005"},
+        {"analysis_type": "overview", "user_id": "CLI001", "requestId": "test-req-004"},
+        {"analysis_type": "sector_breakdown", "user_id": "CLI002", "requestId": "test-req-005"},
     ]
     
     for i, test_event in enumerate(test_events_bedrock_format, 1):
@@ -991,8 +994,8 @@ if __name__ == "__main__":
                     print(f"Parsed Response Body Success: {parsed_body.get('success', 'N/A')}")
                     if parsed_body.get('success'):
                         print(f"Analysis Type: {parsed_body.get('analysis_type', 'N/A')}")
-                        if 'client_name' in parsed_body:
-                            print(f"Client: {parsed_body.get('client_name')}")
+                        if 'user_id' in parsed_body:
+                            print(f"User_id: {parsed_body.get('user_id')}")
                         if 'summary' in parsed_body:
                             summary = parsed_body['summary']
                             print(f"Portfolio Value: ${summary.get('total_portfolio_value', 'N/A'):,}")
